@@ -3,6 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#Files
+ePrime*.txt
+*.csv
+*score.txt
+Tracts/
+
+
+
+
 # C extensions
 *.so
 
@@ -73,9 +82,6 @@ docs/_build/
 
 # PyBuilder
 target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
 
 # IPython
 profile_default/

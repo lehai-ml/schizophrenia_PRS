@@ -5,7 +5,9 @@ The project aims to identify the connectivity markers associated with polygenic 
 #### Table of content
 1. [Objective](#objective)
 2. [Methods](#methods)
-    * [Preprocessing] (##preprocessing)
+    * [Data description](##data-description)
+    * [Preprocessing](##preprocessing)
+    * [Pipeline](##pipeline)
 3. [Results](#results)
 4. [References](#references)
 5. [Packages requirement](#packages-requirement)

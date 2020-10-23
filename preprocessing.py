@@ -1,20 +1,5 @@
 """
-Collections of all preprocessing functions
-
-Data preprocessing:
-
-def babies_connectivity_extraction(directory)
-def ROIs_combinations(csv_filename)
-def read_table_from_txt(file)
-def lower_triangle(matrix)
-
-Graph Creation:
-
-class ROIs_combo
-
-Visualisation:
-
-
+This is a custom files of all preprocessing steps prior to the ML training.
 """
 
 import os
@@ -23,14 +8,18 @@ import pandas as pd
 import networkx as nx
 
 #import sklearn
-
 from sklearn.linear_model import LinearRegression
 
 def babies_connectivity_extraction(directory):
     """
-    extracting the babies ID_names and connectivity matrices
-    INPUT: directory
-    OUTPUT: IDs and connectivity matrices
+    Extracting the babies ID_names and connectivity matrices
+    
+    Args:
+        directory(str): path to the tracts information
+    
+    Returns:
+        ID (list): the name of the babies
+        connectivity_matrix(list): list of connectivity matrices (90 x90)
     """
     ID=[]
     connectivity_matrix=[]
@@ -54,9 +43,15 @@ def babies_connectivity_extraction(directory):
 
 def ROIs_combinations(csv_filename):
     """
-    Output all the combinations of ROIs. For visualisation purposes.
-    INPUT: appended ROIs abbrevation csv file
-    OUTPUT: list of combination in the same order as the connectivity matrices
+    Provide the combination of the Region of Interests.
+    
+    Args:
+        csv_filename(str): path to the filename in .csv
+    
+    Returns:
+    
+        combinations (list): list of combination in the same order as the 
+            connectivity matrices (90x90)
     """
     # import regions of interest names
     ROIs=pd.read_csv(csv_filename).dropna()
@@ -71,9 +66,18 @@ def ROIs_combinations(csv_filename):
     return combinations
 
 def read_table_from_txt(file):
+    
     """
     For reading tables with FID and IID columns in txt
+    Args:
+        file(.txt): path to the txt file
+    
+    Returns:
+        table: table with FID removed, and ID sorted, matched with the babies 
+            ID.
+    
     """
+    
     table=pd.read_table(file,delim_whitespace=True)
     table['IID']=['EP'+str(i) for i in table['IID']]
     table=table.drop('FID',axis=1)
@@ -82,25 +86,34 @@ def read_table_from_txt(file):
     return table
 
 def lower_triangle(matrix,side_of_the_square=90):
-    '''
-    Organizes the 90x90 matrix into 4005 1D vector. Because the matrix is unidirectional, only the lower triangle is needed.
+    """
+    Organizes a square unidirectional matrix into 1D vector. Because the matrix 
+        is unidirectional, only the lower triangle is needed.
     
-    Input: 90x90 matrix
-    side_of_the_square=90
-    Output: 4005 1D vector
+    Args:
+        matrix(np.array): the square matrix
+        side_of_the_square(int): the side of the square. 90 (Default)
     
-    '''
+    Returns:
+        new_array(np.array): 1D vector of the lower half.
+    """
     lower_triangle=[matrix[i][n]
                   for i in range(1,side_of_the_square) for n in range(i)]
     return np.asarray(lower_triangle)
 
 def extract_by_ID(ID_list,original_ID_array,original_array,remove=False):
     """
-    extract by the babies ID, requires for matching by ID and after outliers
-    INPUT: ID_list: the list of ID that need to be matched,
-    original_ID_array: the place where the original ID is,
-    original_array: the array that needs to be changed
-    OUTPUT: new_array
+    Extract by the babies ID, required for matching by ID and after outliers
+    
+    Args:
+        ID_list(list): the list of ID that need to be matched to
+        original_ID_array(list): the list of ID that needs to be modified
+        original_array(list): the array that needs to be modified
+        remove(bool): Do you want to remove those ID?
+    
+    Returns:
+
+        new_array
     """
     indices=[np.where(np.asarray(original_ID_array)==i)[0][0] for i in ID_list]
     if remove:
@@ -112,9 +125,12 @@ def extract_by_ID(ID_list,original_ID_array,original_array,remove=False):
 def adjusting_for_covariates_with_lin_reg(y,covariates=([])):
     """
     Adjusting for covariates using linear regression.
-    INPUTs:covariates= list of covariates
-    y=Features to be adjusted
-    Outputs: new_feature= adjusted features
+    Args:
+        y: Features to be adjusted
+        covariates(list):list of covariates
+        
+    Returns:
+        new_feature: adjusted features
     """
     X=np.concatenate([i.reshape(-1,1) if i.ndim==1 else i for i in covariates],axis=1)
     lin_reg=LinearRegression()

@@ -1,32 +1,46 @@
+"""
+This custom file contains functions to run scikit-learn preprocessing pipelines 
+    and training ML models.
+
+"""
 # from sklearn.preprocessing import StandardScaler, LabelEncoder
 # from sklearn.pipeline import Pipeline
 # from sklearn.linear_model import LinearRegression,LogisticRegression
 # from sklearn.model_selection import train_test_split, StratifiedShuffleSplit,cross_val_score,GridSearchCV,cross_validate, cross_val_predict,StratifiedKFold
 # from sklearn.metrics import accuracy_score, r2_score, mean_squared_error,make_scorer,confusion_matrix,multilabel_confusion_matrix
 
+
 #Scikit-lib
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_selection import VarianceThreshold,SelectFromModel
 
-
+#Network visualisation and algorithm
 import networkx as nx
 from networkx.algorithms.community import greedy_modularity_communities
 
-
-import preprocessing
+#Python essentials
 import pandas as pd
 import numpy as np
 import inspect
 import operator
 from itertools import chain
 
+#Custom functions
+import preprocessing
 
 def lowest_percent_variance(percent,variance_object):
+    
     """
-    percent in the form of decimal points
-    variance_object=VarianceThreshold().fit()
-    if percent =0, then the threshold=0.0
+    Returns a VarianceThreshold transfomer with a new threshold.
+    
+    Args:
+        percent (float): The percentage of variances you want to remove.
+        variance_object(VarianceThreshold()): The fitted to data 
+            VarianceThreshold()
+    
+    Returns:
+        variance_object: A new VarianceThreshold() with a new defined threshold.
     """
     variance_list=np.unique(variance_object.variances_) #this will give a sorted list of all feature variances
     new_threshold_idx=int(np.ceil(len(variance_list)*percent)) # this will give me the index of the new threshold (so if there are 100 unique variances and I want the lowest 20% variances, this will give me the index of the variance, which value is at 20% of all variances)
@@ -36,12 +50,18 @@ def lowest_percent_variance(percent,variance_object):
 
 def compare_values_in_dict(target_corr_dict,highest_corr_pair):
     """
-    Given a dictionary of feature and target and a list of the highest correlated pair, return the lower correlated key to be removed
-    -----to be used as part of the greedy corr elimination-----
-    Input: target_corr_dict= dictionary containing the correlation coef between the target and the feature.
-    highest_corr_pair= the highest correlated pair
-    Output:
-    the lower correlated feature to the target
+    Returns the lower correlated to the target feature. To be used as part of   
+        the greedy elimination of correlated pairs.
+    
+    Args:
+        target_corr_dict(dict): dictionary containing the correlation coef
+            between the target and the feature.
+        highest_corr_pair (str): Indices of two features separated by "."
+    
+    Returns:
+        the lower correlated feature to the target. If they are equal, returns
+            the second one.
+
     """
     highest_corr_pair=str.split(highest_corr_pair,'.')
     target0=target_corr_dict[int(highest_corr_pair[0])]
@@ -54,15 +74,34 @@ def compare_values_in_dict(target_corr_dict,highest_corr_pair):
     else:
         return highest_corr_pair[1]
 
-def remove_correlated_features(X, y, combination_index, thresh=0.8, greedy=True):
+def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimination'):
     """
-    Remove correlated features using greedy vs. PCA approaches
-    Input
-    X: 2D matrix of features
-    y: target 1D matrix
-    If greedy (Default) elimination: will reiterively pick the highest correlated feature pair and then retain the feature that has higher correlation to the target, and will remove the other one. This process is repeated until there is no correlated pairs.
+    Remove correlated features using greedy elimination vs. greedy modularity 
+        maximization  approaches.
     
-    If PCA: Instead of eliminating recursively the correlated pairs, I look at the connected components in the correlated matrix. For each subgraph (connected network of correlated features) I perform greedy modularity maximization. Essentially I group the components in the subgraph into smaller communities, on which I perform PCA.
+    Args:
+        X(np.array): 2D matrix of features
+        y(np.array): target 1D matrix
+        combination_index: 1D matrix of all features indices.
+        thresh (float): the threshold for correlation. Default at 0.8
+        met (str): To use greedy 'elimination' (Default) or greedy modularity
+            'maximization'. 
+                - 'elimination': will reiterively pick the highest correlated  
+                feature pair and retain the feature that has the higher 
+                correlation to the target. This process is repeated until there 
+                is no other correlated pairs.
+                - 'maximization': will find optimal communities in graph of 
+                correlated features using Clauset-Newman-Moore greedy 
+                modularity maximization. The communities are then passed 
+                through a PCA. See more help(networkx.algorithms.community.
+                greedy_modularity_communities)
+    
+    Returns:
+        If 'elimination': combination_index (np.array): set of new feature 
+            indices (in the same order as the original set)
+        If 'maximization': combination_index (np.array): set of feature 
+            indices. and PCA_list(list): list of set of distinct communities, 
+            which will then be passed to a PCA.
     """
     correlated_matrix=preprocessing.lower_triangle(abs(np.corrcoef(X,rowvar=False)),side_of_the_square=X.shape[1]) #extract the lower triangle of the absolute correlation matrix. this will have a shape (n_features^2)/2
     
@@ -83,7 +122,7 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, greedy=True)
      
     temp_target_dict=dict(zip(combination_index,(correlated_to_target))) # this will create a dictionary, where the keys are the name of the combination feature, and the values is the corr coef to the target.
     
-    if greedy: #if greedy elimination is selected.
+    if (met=='elimination'): #if greedy elimination is selected.
         
         features_to_be_removed=[] # this is the list of features that do not survive the greedy elimination, i.e. they have high corr coef to other features, but not high enough to the target.
         
@@ -152,15 +191,25 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, greedy=True)
 
 class FeatureReduction(BaseEstimator,TransformerMixin):
     
-    """
-    This will handle all the transformation of the data
-    Parameters:
-    variance_percent= denotes the percentage of features removed by the VarianceThreshold. 0.20 (Default) denotes to remove the lowest 20% of variances. See running_model.lowest_percent_variance for more information
-    variant_transformer=VarianceThreshold Object.
-    
-    
-    """    
-    def __init__(self,variance_percent=.2,variance_transformer=VarianceThreshold(),thresh=0.8,greedy=True):
+    '''
+    This will handle all the feature reduction transformation of the dataset.
+    '''
+    def __init__(self,variance_percent=.2,thresh=0.8,met='elimination'):
+        
+        """
+        Initialize the object
+        Args:
+            variance_percent (float): the percentage of the variance to be 
+                removed.
+            thresh (float): the correlation threshold to be removed.
+            met (str): the method of removing correlated features. Greedy 
+                'elimination' (Default) or greedy modularity 'maximization'.
+                
+        Attributes:
+            self.variance_percent
+            self.thresh
+            self.met
+        """
         
         args, _, _, values=inspect.getargvalues(inspect.currentframe())
         values.pop('self')
@@ -169,21 +218,34 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
             setattr(self, arg,val)
     
     def fit (self,X,y):
+        """
+        Fitting the the transformer.
         
-        self.variance_transformer=lowest_percent_variance(percent=self.variance_percent,variance_object=self.variance_transformer.fit(X))
+        Args:
+            X: 2D dataset of features.
+            y: 1D vector of the target.
+        
+        Return
+            self.variance_transformer: VarianceThreshold() with new threshold
+            self.corr_idx
+            self.PCA_list
+            self.pca_dict
+            self.pca_dict_name
+        """
+        self.variance_transformer=lowest_percent_variance(percent=self.variance_percent,variance_object=VarianceThreshold.fit(X))
         
         variance_idx=np.where(self.variance_transformer.get_support())[0]#get variance transformed feature idx.
         
-        if self.greedy:
+        if (self.met=='elimination'):
             
-            self.corr_idx=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,greedy=self.greedy)
+            self.corr_idx=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,met=self.met)
             
         else:
             
-            self.corr_idx,self.PCA_list=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,greedy=self.greedy)
+            self.corr_idx,self.PCA_list=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,met=self.met)
         
-            self.pca_dict=dict()
-            self.pca_dict_name=dict()
+            self.pca_dict=dict()# dictionary of different PCA transformers.
+            self.pca_dict_name=dict()# dictionary of the name of different PCA transformers.
             
             for i in range(len(self.PCA_list)):
                 self.pca_dict[i]=PCA(n_components=0.8,random_state=42).fit(X[:,self.PCA_list[i]])
@@ -193,7 +255,18 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
     
             
     def transform(self,X,y=None):
-        if self.greedy:
+        """
+        Transforming the dataset.
+        
+        Args:
+            X: 2D dataset of features.
+            y(optional): 1D vector of the target.
+        
+        Return
+            new_X: transformed X
+        """
+        
+        if (self.met=='elimination'):
             new_X=X[:,self.corr_idx]
             return new_X
         
@@ -202,7 +275,7 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
             new_X=X[:,self.corr_idx]
             print('shape of new_X is:', new_X.shape)
             for i in range(len(self.pca_dict)):
-                new_X=np.append(new_X,self.pca_dict[i].transform(X[:,self.PCA_list[i]]),axis=1)    
+                new_X=np.append(new_X,self.pca_dict[i].transform(X[:,self.PCA_list[i]]),axis=1)
             print('shape of new_X is:', new_X.shape)
             return new_X
 
@@ -310,3 +383,7 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
 #     output['cross_validate_specificity']=cross_validate_specificity
 #     output['cross_validate_accuracy']=cross_validate_accuracy
 #     return output
+
+
+if __name__ == "__main__":
+    pass

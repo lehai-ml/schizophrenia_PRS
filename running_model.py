@@ -24,7 +24,7 @@ import pandas as pd
 import numpy as np
 import inspect
 import operator
-from itertools import chain
+from itertools import chain,combinations
 
 #Custom functions
 import preprocessing
@@ -107,16 +107,20 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
     
     correlated_to_target=np.asarray([preprocessing.lower_triangle(abs(np.corrcoef(X[:,i],y,rowvar=False)),2)[0] for i in range(X.shape[1])]) #this will calculates the absolute correlation between each feature with the target. this will have shape (n_features,)
     
-    correlation_matrix_idx=[]
-    for i in combination_index:
-        indices=[str(i)+'.'+str(n) for n in combination_index]#so 2.0 would mean the correlation between SFGdor.L_PreCG.R and PreCG.R_PreCG.L
-        correlation_matrix_idx.append(indices)
-        
-    correlation_matrix_idx=np.vstack(correlation_matrix_idx)
-    correlation_matrix_idx=preprocessing.lower_triangle(correlation_matrix_idx,side_of_the_square=correlation_matrix_idx.shape[0]) # this will let me know the name of the correlation pairs. The indices will have the same order of the original indices.
+    # correlation_matrix_idx=[]
+    # for i in combination_index:
+    #     indices=[str(i)+'.'+str(n) for n in combination_index]#so 2.0 would mean the correlation between SFGdor.L_PreCG.R and PreCG.R_PreCG.L
+    #     correlation_matrix_idx.append(indices)
+    
+    # correlation_matrix_idx=np.vstack(correlation_matrix_idx)
+    # correlation_matrix_idx=preprocessing.lower_triangle(correlation_matrix_idx,side_of_the_square=correlation_matrix_idx.shape[0]) # this will let me know the name of the correlation pairs. The indices will have the same order of the original indices.
+    
+    combination_index_in_string=[str(i) for i in combination_index[::-1]]#the same combination_index in string format. Running with itertools.combinations will improve the timing.
+    
+    correlation_matrix_idx=[s1+"."+s2 for s1,s2 in combinations(combination_index_string,2)]#this create a list of correlated pairs index
+    correlation_matrix_idx=np.asarray(correlation_matrix_idx)[::-1]# this will put them in the same order as the calculated correlated pairs. This will produce the lower triangle.
 
     correlated_pairs_idx=np.where(correlated_matrix>thresh)[0]#which pair is highly correlated. threshold of the corr coef is set at 0.8 Default
-    
     
     temp_dict=dict(zip(correlation_matrix_idx[correlated_pairs_idx],correlated_matrix[correlated_pairs_idx])) #this will create a dictionary, where the keys are the correlated pairs, and the values are the highest correlated coefficient.
      

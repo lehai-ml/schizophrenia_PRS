@@ -117,7 +117,7 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
     
     combination_index_in_string=[str(i) for i in combination_index[::-1]]#the same combination_index in string format. Running with itertools.combinations will improve the timing.
     
-    correlation_matrix_idx=[s1+"."+s2 for s1,s2 in combinations(combination_index_string,2)]#this create a list of correlated pairs index
+    correlation_matrix_idx=[s1+"."+s2 for s1,s2 in combinations(combination_index_in_string,2)]#this create a list of correlated pairs index
     correlation_matrix_idx=np.asarray(correlation_matrix_idx)[::-1]# this will put them in the same order as the calculated correlated pairs. This will produce the lower triangle.
 
     correlated_pairs_idx=np.where(correlated_matrix>thresh)[0]#which pair is highly correlated. threshold of the corr coef is set at 0.8 Default

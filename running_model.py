@@ -64,8 +64,8 @@ def compare_values_in_dict(target_corr_dict,highest_corr_pair):
 
     """
     highest_corr_pair=str.split(highest_corr_pair,'.')
-    target0=target_corr_dict[int(highest_corr_pair[0])]
-    target1=target_corr_dict[int(highest_corr_pair[1])]
+    target0=target_corr_dict[highest_corr_pair[0]]
+    target1=target_corr_dict[highest_corr_pair[1]]
     
     if target0==target1:
         return highest_corr_pair[1] #to remove
@@ -92,28 +92,19 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
                 is no other correlated pairs.
                 - 'maximization': will find optimal communities in graph of 
                 correlated features using Clauset-Newman-Moore greedy 
-                modularity maximization. The communities are then passed 
-                through a PCA. See more help(networkx.algorithms.community.
+                modularity maximization. The node with the highest weighted 
+                degree (weighted sum of all the connecting edges) in each 
+                community will be used as the representative for that community.
+                See more help(networkx.algorithms.community.
                 greedy_modularity_communities)
     
     Returns:
-        If 'elimination': combination_index (np.array): set of new feature 
+        combination_index (np.array): set of new feature 
             indices (in the same order as the original set)
-        If 'maximization': combination_index (np.array): set of feature 
-            indices. and PCA_list(list): list of set of distinct communities, 
-            which will then be passed to a PCA.
     """
     correlated_matrix=preprocessing.lower_triangle(abs(np.corrcoef(X,rowvar=False)),side_of_the_square=X.shape[1]) #extract the lower triangle of the absolute correlation matrix. this will have a shape (n_features^2)/2
     
     correlated_to_target=np.asarray([preprocessing.lower_triangle(abs(np.corrcoef(X[:,i],y,rowvar=False)),2)[0] for i in range(X.shape[1])]) #this will calculates the absolute correlation between each feature with the target. this will have shape (n_features,)
-    
-    # correlation_matrix_idx=[]
-    # for i in combination_index:
-    #     indices=[str(i)+'.'+str(n) for n in combination_index]#so 2.0 would mean the correlation between SFGdor.L_PreCG.R and PreCG.R_PreCG.L
-    #     correlation_matrix_idx.append(indices)
-    
-    # correlation_matrix_idx=np.vstack(correlation_matrix_idx)
-    # correlation_matrix_idx=preprocessing.lower_triangle(correlation_matrix_idx,side_of_the_square=correlation_matrix_idx.shape[0]) # this will let me know the name of the correlation pairs. The indices will have the same order of the original indices.
     
     combination_index_in_string=[str(i) for i in combination_index[::-1]]#the same combination_index in string format. Running with itertools.combinations will improve the timing.
     
@@ -124,7 +115,7 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
     
     temp_dict=dict(zip(correlation_matrix_idx[correlated_pairs_idx],correlated_matrix[correlated_pairs_idx])) #this will create a dictionary, where the keys are the correlated pairs, and the values are the highest correlated coefficient.
      
-    temp_target_dict=dict(zip(combination_index,(correlated_to_target))) # this will create a dictionary, where the keys are the name of the combination feature, and the values is the corr coef to the target.
+    temp_target_dict=dict(zip(map(str,combination_index),(correlated_to_target))) # this will create a dictionary, where the keys are the name of the combination feature, and the values is the corr coef to the target.
     
     if (met=='elimination'): #if greedy elimination is selected.
         
@@ -149,9 +140,9 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
         
         return combination_index
     
-    else: #using PCA
+    else: # using modularity maximization
         
-        Graph=nx.MultiGraph()#this is undirected graph
+        Graph=nx.MultiGraph()#this is an undirected graph
         source_list=[]
         target_list=[]
         edge_list=[str.split(i,'.') for i in temp_dict.keys()]#this is the list of edges
@@ -162,36 +153,21 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
             {
                 "source":source_list,
                 "target":target_list,
+                "weight":[i for i in temp_dict.values()]
             }
         )
-        Graph=nx.from_pandas_edgelist(edges_df)#create a graph
-                
-                
-        s_graph=[Graph.subgraph(n) for n in nx.connected_components(Graph)] # create number of subgraphs of connected components. Some of the graphs will have more than 100 features, and some will be only 2.
+        Graph=nx.from_pandas_edgelist(edges_df,edge_attr=True)#create a graph
+        
+        s_graph=[Graph.subgraph(n) for n in greedy_modularity_communities(Graph)] # create number of subgraphs of connected components. Some of the graphs will have more than 100 features, and some will be only 2.
+        
+        to_retain_nodes=map(lambda x: max(dict(x.degree(weight='weight')).items(),key=operator.itemgetter(1))[0],s_graph)# this returns the nodes with highest weighted degree.
 
-
-        PCA_list=[]
-        #create a list of features combinations, that will be passed to PCA.
-        for small_graph in s_graph:
-            #pass in greedy_modularity_communities:
-            com=list(greedy_modularity_communities(small_graph))
-            com=[sorted(c) for c in com]
-            PCA_list.append(com)
-
-        PCA_list=list(chain.from_iterable(PCA_list)) # to remove one double square bracket
-
-        features_to_be_removed=list(chain.from_iterable(PCA_list))
-
-        print('len of combination_index is:%d'%len(combination_index))
+        Graph.remove_nodes_from(to_retain_nodes)
+        features_to_be_removed=list(Graph.nodes)# the rest is to be removed.
 
         combination_index=np.asarray([i for i in combination_index if str(i) not in features_to_be_removed])#remove all the features from the combination index.
-
-        PCA_list=[sorted([int(i) for i in list(n)]) for n in PCA_list]# makes sure that the features passed into PCA are sorted. So that later on the feature names will be the same.
-
-        #return combination_index, s_graph
-        print('len of combination_index is:%d'%len(combination_index))
         
-        return combination_index,PCA_list
+        return combination_index
 
 class FeatureReduction(BaseEstimator,TransformerMixin):
     
@@ -232,29 +208,14 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
         Return
             self.variance_transformer: VarianceThreshold() with new threshold
             self.corr_idx
-            self.PCA_list
-            self.pca_dict
-            self.pca_dict_name
         """
-        self.variance_transformer=lowest_percent_variance(percent=self.variance_percent,variance_object=VarianceThreshold.fit(X))
+        
+        self.variance_transformer=lowest_percent_variance(percent=self.variance_percent,variance_object=VarianceThreshold().fit(X))
         
         variance_idx=np.where(self.variance_transformer.get_support())[0]#get variance transformed feature idx.
+                 
+        self.corr_idx=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,met=self.met)
         
-        if (self.met=='elimination'):
-            
-            self.corr_idx=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,met=self.met)
-            
-        else:
-            
-            self.corr_idx,self.PCA_list=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,met=self.met)
-        
-            self.pca_dict=dict()# dictionary of different PCA transformers.
-            self.pca_dict_name=dict()# dictionary of the name of different PCA transformers.
-            
-            for i in range(len(self.PCA_list)):
-                self.pca_dict[i]=PCA(n_components=0.8,random_state=42).fit(X[:,self.PCA_list[i]])
-                self.pca_dict_name[i]=['_'.join(['PCA','.'.join([str(f) for f in self.PCA_list[i]]),str(n)]) for n in range(len(self.pca_dict[i].explained_variance_ratio_))]
-                
         return self
     
             
@@ -270,19 +231,8 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
             new_X: transformed X
         """
         
-        if (self.met=='elimination'):
-            new_X=X[:,self.corr_idx]
-            return new_X
-        
-        else:
-            
-            new_X=X[:,self.corr_idx]
-            print('shape of new_X is:', new_X.shape)
-            for i in range(len(self.pca_dict)):
-                new_X=np.append(new_X,self.pca_dict[i].transform(X[:,self.PCA_list[i]]),axis=1)
-            print('shape of new_X is:', new_X.shape)
-            return new_X
-
+        new_X=X[:,self.corr_idx]
+        return new_X
 
 
 # class scikit_model:

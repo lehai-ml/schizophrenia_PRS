@@ -2,13 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.DS_Store
 #Files
 ePrime*.txt
 *.csv
 *score.txt
 Tracts/
-
+test/
 
 
 

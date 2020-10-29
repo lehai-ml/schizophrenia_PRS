@@ -3,17 +3,10 @@ This custom file contains functions to run scikit-learn preprocessing pipelines
     and training ML models.
 
 """
-# from sklearn.preprocessing import StandardScaler, LabelEncoder
-# from sklearn.pipeline import Pipeline
-# from sklearn.linear_model import LinearRegression,LogisticRegression
-# from sklearn.model_selection import train_test_split, StratifiedShuffleSplit,cross_val_score,GridSearchCV,cross_validate, cross_val_predict,StratifiedKFold
-# from sklearn.metrics import accuracy_score, r2_score, mean_squared_error,make_scorer,confusion_matrix,multilabel_confusion_matrix
-
-
 #Scikit-lib
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.feature_selection import VarianceThreshold,SelectFromModel
+from sklearn.feature_selection import VarianceThreshold
 
 #Network visualisation and algorithm
 import networkx as nx
@@ -32,8 +25,9 @@ import preprocessing
 def lowest_percent_variance(percent,variance_object):
     
     """
+    ___________________________________________________________
     Returns a VarianceThreshold transfomer with a new threshold.
-    
+    ___________________________________________________________
     Args:
         percent (float): The percentage of variances you want to remove.
         variance_object(VarianceThreshold()): The fitted to data 
@@ -50,9 +44,10 @@ def lowest_percent_variance(percent,variance_object):
 
 def compare_values_in_dict(target_corr_dict,highest_corr_pair):
     """
+    _________________________________________________________________________
     Returns the lower correlated to the target feature. To be used as part of   
         the greedy elimination of correlated pairs.
-    
+    _________________________________________________________________________
     Args:
         target_corr_dict(dict): dictionary containing the correlation coef
             between the target and the feature.
@@ -76,9 +71,10 @@ def compare_values_in_dict(target_corr_dict,highest_corr_pair):
 
 def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimination'):
     """
+    _________________________________________________________________________
     Remove correlated features using greedy elimination vs. greedy modularity 
         maximization  approaches.
-    
+    _________________________________________________________________________
     Args:
         X(np.array): 2D matrix of features
         y(np.array): target 1D matrix
@@ -199,8 +195,9 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
     
     def fit (self,X,y):
         """
+        ______________________________
         Fitting the the transformer.
-        
+        ______________________________
         Args:
             X: 2D dataset of features.
             y: 1D vector of the target.
@@ -221,8 +218,9 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
             
     def transform(self,X,y=None):
         """
+        ______________________________
         Transforming the dataset.
-        
+        ______________________________
         Args:
             X: 2D dataset of features.
             y(optional): 1D vector of the target.
@@ -233,111 +231,6 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
         
         new_X=X[:,self.corr_idx]
         return new_X
-
-
-# class scikit_model:
-#     """
-#     docstring
-#     """
-#     def __init__(self,model,X,y,hyperparameters,filepath=None,model_name=None,step=0.001,grid_search=True):
-#         """
-#         """
-#         self.model=model
-        
-#     def Select_From_Model(self):
-#         """
-#         docstring
-#         """
-#         inner_cv=StratifiedKFold(n_splits=4,random_state=42)
-#         outer_cv=StratifiedKFold(n_splits=5,random_state=42)
-        
-#         fold_number=0
-        
-#         for train_index,test_index in outer_cv.split(self.X,self.y):
-            
-#             fold_number+=1
-#             #divide training sets into outer folds
-            
-#             X_train=self.X[train_index,:]
-#             y_train=self.y[train_index]
-#             X_test=self.X[test_index,:]
-#             y_test=self.y[test_index]
-
-            
-            
-        
-# def Select_From_Model(model,hyperparameter,filepath=None,model_name=None,step=0.001,grid_search=True,rfe_cv=False,Features_corrected=Features_corrected,
-#            data_Status=data_Status):
-
-#     test_sensitivity=[]
-#     test_specificity=[]
-#     test_accuracy=[]
-#     cross_validate_sensitivity=[]
-#     cross_validate_specificity=[]
-#     cross_validate_accuracy=[]
-#     n_features=[]
-#     inner_cv=StratifiedKFold(n_splits=4,random_state=42)
-#     outer_cv=StratifiedKFold(n_splits=5,random_state=42)
-
-#     fold_number=0
-
-#     for train_index,test_index in outer_cv.split(Features_corrected,data_Status):
-
-#         fold_number+=1
-#         #divide training sets into outer folds
-#         X_train=Features_corrected[train_index,:]
-#         y_train=data_Status[train_index]
-#         X_test=Features_corrected[test_index,:]
-#         y_test=data_Status[test_index]
-
-#         #Standardscale the dataset based on the X_train set and correct for imbalance in training dataset
-#         scaler=StandardScaler()
-#         scaler.fit(X_train)
-#         X_train_scaled=scaler.transform(X_train)
-#         X_test_scaled=scaler.transform(X_test)
-
-#         sfm=SelectFromModel(model)
-#         sfm.fit(X_train_scaled,y_train)    
-
-#         if grid_search==True:
-#             clf = GridSearchCV(estimator=model, param_grid=hyperparameter, cv=inner_cv,
-#                                    iid=False)
-#             clf.fit(sfm.transform(X_train_scaled),y_train)
-#             tuned_model=clf.best_estimator_.fit(sfm.transform(X_train_scaled),y_train)
-#         else:
-#             tuned_model=model.fit(sfm.transform(X_train_scaled),y_train)
-        
-#         if rfe_cv==True:
-#             rfe = RFECV(estimator=tuned_model, step=step, cv=inner_cv,verbose=0)
-#             rfe.fit(sfm.transform(X_train_scaled),y_train)
-            
-# #             pickle_dump(rfe,filepath=filepath,model_name=model_name,
-# #                        fold_number=fold_number)
-            
-#             tuned_model=rfe
-        
-#         scores=cross_validate(tuned_model,sfm.transform(X_train_scaled),y_train,scoring=scoring,cv=inner_cv)
-
-#         cross_validate_sensitivity.append(scores['test_sensitivity'].mean())
-#         cross_validate_specificity.append(scores['test_specificity'].mean())  
-#         cross_validate_accuracy.append(scores['test_accuracy'].mean())
-
-
-#         y_pred=tuned_model.predict(sfm.transform(X_test_scaled))
-#     #    my test scores append them based on folds.
-#         test_sensitivity.append(sensitivity(y_pred=y_pred,y_true=y_test))
-#         test_specificity.append(specificity(y_pred=y_pred,y_true=y_test))
-#         test_accuracy.append(accuracy_score(y_pred=y_pred,y_true=y_test))
-#     print(X_train_scaled.shape)
-#     output=dict()
-#     output['test_accuracy']=test_accuracy
-#     output['test_sensitivity']=test_sensitivity
-#     output['test_specificity']=test_specificity
-#     output['cross_validate_sensitivity']=cross_validate_sensitivity
-#     output['cross_validate_specificity']=cross_validate_specificity
-#     output['cross_validate_accuracy']=cross_validate_accuracy
-#     return output
-
-
+    
 if __name__ == "__main__":
     pass

@@ -2,12 +2,14 @@
 Executing the finetuning and model selection. This is used for regression 
     model, but can be modified to fit other problems.
 """
+import warnings
+warnings.simplefilter(action='ignore', category=Warning)
 
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectFromModel,SelectPercentile,f_regression,RFECV
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LinearRegression,LogisticRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold,cross_val_score,GridSearchCV,RandomizedSearchCV, cross_validate
 from sklearn.metrics import mean_squared_error
 
@@ -17,10 +19,7 @@ import inspect
 import running_model
 
 import numpy as np
-
-
-    
-    
+import sys
     
 
 
@@ -58,6 +57,16 @@ def save_a_npy(npy_array,npy_name,split_no,filepath):
     filepath=filepath+'split_'+str(split_no)+npy_name+'.npy'
     return np.save(filepath,npy_array)
 
+def save_the_object(object,filepath):
+    
+    with open(filepath,'wb') as output:
+        pickle.dump(object,output,pickle.HIGHEST_PROTOCOL)
+
+def load_the_object(filepath):
+    with open(filepath, 'rb') as input:
+        x=pickle.load(filepath)
+    return x
+    
 
 def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',cv=4,scoring='neg_mean_squared_error'):
     """
@@ -183,8 +192,7 @@ class scikit_model:
         self.parameters_dict=dict({'lin_reg':None,
                          'lasso':{'alpha':[0]},
                          'ridge':{'alpha':np.linspace(200,500,10)},
-                         'random_forest':{'n_estimators':[3,10,30],
-                         'max_features':[2,4,6,8]},
+                         'random_forest':{'n_estimators':[3,10,30]},
                          'svm':{},
                          'knn':{}})
 
@@ -224,7 +232,7 @@ class scikit_model:
         inner_cv=KFold(n_splits=4,random_state=self.random_state)
         outer_cv=KFold(n_splits=5,random_state=self.random_state)
         #create inner and outer folds
-        
+
         fold_number=0
         self.cross_validated_scores_across_all_splits=[]
         self.test_scores_across_all_splits=[]
@@ -232,7 +240,7 @@ class scikit_model:
         for train_index,test_index in outer_cv.split(self.X,self.y):
             
             fold_number+=1
-            
+            print('I am starting the fold %d'%fold_number)
             X_train=self.X[train_index,:]
             y_train=self.y[train_index]
             X_test=self.X[test_index,:]
@@ -250,7 +258,7 @@ class scikit_model:
             pipe1=Pipeline([('featureRed',running_model.FeatureReduction()),('select_percentile',SelectPercentile(f_regression,percentile=20))])#this part is the filtering technique.
             
             pipe1.fit(X_train,y_train)
-            
+            print('I just finished with pipe1 of fold%d'%fold_number)
             X_train_reduced_after_pipe1=pipe1.transform(X_train)
             combination_idx_after_pipe1=pipe1.transform(combination_idx.reshape(1,-1))
 
@@ -259,7 +267,7 @@ class scikit_model:
             save_a_model(pipe1,model_name='pipe1',split_no=fold_number,filepath=self.filepath)
             save_a_npy(combination_idx_after_pipe1,npy_name='combination_idx_after_pipe1',split_no=fold_number,filepath=self.filepath)
             #save the pipe1 and the combination indices.
-            
+            print('I am beginning to fine tune')
             fine_tuned_estimator=fine_tune_hyperparameters(param_dict=self.parameters_dict,model=self.model,X=X_train_reduced_after_pipe1,y=y_train,model_name=self.model_name,fine_tune=self.fine_tune,cv=inner_cv)
             #fine-tune hyperparameters of the regression model on the new X_train
             
@@ -272,8 +280,8 @@ class scikit_model:
             combination_idx_after_sfm2=sfm.transform(combination_idx_after_pipe1)
             save_a_npy(combination_idx_after_sfm2,npy_name='combination_idx_after_sfm2',split_no=fold_number,filepath=self.filepath)
             #save the new combination_indices after the second filter.
-            
-            rfecv=RFECV(estimator=sfm.estimator,step=self.step,scoring='neg_mean_squared_error').fit(X_train_reduced_after_sfm2,y_train)
+            print('I am beginning the Recursive Feature Elimination')
+            rfecv=RFECV(estimator=sfm.estimator,step=self.step,scoring='neg_mean_squared_error',cv=inner_cv).fit(X_train_reduced_after_sfm2,y_train)
             
             combination_idx_after_rfecv=rfecv.transform(combination_idx_after_sfm2)
             
@@ -282,7 +290,7 @@ class scikit_model:
             
             save_a_model(rfecv,model_name='rfecv',split_no=fold_number,filepath=self.filepath)
             #save the rfecv model
-        
+            print('my RFECV is done for fold %d'%fold_number)
             rfecv.estimator.fit(rfecv.transform(X_train_reduced_after_sfm2),y_train)
             scores=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_sfm2),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
             
@@ -297,5 +305,35 @@ class scikit_model:
         
         
 if __name__ == "__main__":
-    pass
+    
+    from sklearn.linear_model import LinearRegression, Lasso, Ridge
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.svm import SVR
+    
+    
+    X=np.load(sys.argv[1])
+    y=np.load(sys.argv[2])
+    model_dict={'lin_reg':LinearRegression(),
+                'lasso':Lasso(),
+                'ridge':Ridge(),
+                'random_forest':RandomForestRegressor(),
+                'svr':SVR()}
+    model_name=input('model name:')
+    model=model_dict[model_name]
+    filepath=input('filepath:')
+    # filepath='./'
+    # fine_tune=input('fine tune (grid/randomized):')
+    x=scikit_model(model,X,y,fine_tune='grid',filepath=filepath,model_name=model_name,step=1,random_state=42)
+    x.feature_selection_model()
+    
+    #saving this object for logging purposes
+
+    import pickle
+    class_name=filepath+'object'+model_name+'.pkl'
+    with open(class_name,'wb') as output:
+        pickle.dump(x,output,pickle.HIGHEST_PROTOCOL)
+    
+    
+    
+    
     

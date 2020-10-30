@@ -9,7 +9,10 @@ ePrime*.txt
 *score.txt
 Tracts/
 test/
+*.npy
+*.pkl
 
+.ipynb_checkpoints/
 
 
 # C extensions

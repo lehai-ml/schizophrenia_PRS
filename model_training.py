@@ -13,7 +13,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold,cross_val_score,GridSearchCV,RandomizedSearchCV, cross_validate
 from sklearn.metrics import mean_squared_error
 
-from sklearn.externals import joblib
+import joblib
 
 import inspect
 import running_model
@@ -126,7 +126,7 @@ def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',c
             search=GridSearchCV(model,param_grid=param_grid,cv=cv,iid=False,scoring=scoring)
             
         else:
-            search=RandomizedSearchCV(model,param_distributions=param_grid,cv=cv,scoring=scoring)
+            search=RandomizedSearchCV(model,param_distributions=param_grid,cv=cv,n_iter=100,scoring=scoring)
         
         search.fit(X,y)
         
@@ -192,8 +192,8 @@ class scikit_model:
         self.parameters_dict=dict({'lin_reg':None,
                          'lasso':{'alpha':[0]},
                          'ridge':{'alpha':np.linspace(200,500,10)},
-                         'random_forest':{'n_estimators':[3,10,30]},
-                         'svm':{},
+                         'random_forest':{'n_estimators':[3,10,30],'max_depth':[0],'min_samples_split':[0],'min_samples_leaf':[0],'max_leaf_nodes':[0]},
+                         'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{}})
 
     def feature_selection_model(self,combination_idx=np.arange(4005)):
@@ -308,7 +308,7 @@ if __name__ == "__main__":
     
     from sklearn.linear_model import LinearRegression, Lasso, Ridge
     from sklearn.ensemble import RandomForestRegressor
-    from sklearn.svm import SVR
+    from sklearn.svm import LinearSVR
     
     
     X=np.load(sys.argv[1])
@@ -316,14 +316,14 @@ if __name__ == "__main__":
     model_dict={'lin_reg':LinearRegression(),
                 'lasso':Lasso(),
                 'ridge':Ridge(),
-                'random_forest':RandomForestRegressor(),
-                'svr':SVR()}
+                'random_forest':RandomForestRegressor(random_state=42,n_jobs=-1),
+                'lin_svr':LinearSVR()}
     model_name=input('model name:')
     model=model_dict[model_name]
     filepath=input('filepath:')
     # filepath='./'
-    # fine_tune=input('fine tune (grid/randomized):')
-    x=scikit_model(model,X,y,fine_tune='grid',filepath=filepath,model_name=model_name,step=1,random_state=42)
+    fine_tune=input('fine tune (grid/randomized):')
+    x=scikit_model(model,X,y,fine_tune=fine_tune,filepath=filepath,model_name=model_name,step=1,random_state=42)
     x.feature_selection_model()
     
     #saving this object for logging purposes

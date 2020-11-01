@@ -226,7 +226,7 @@ class scikit_model:
                          'ridge':{'alpha':np.linspace(200,500,10)},
                          'random_forest':{'n_estimators':[3,10,30],'max_depth':[0],'min_samples_split':[0],'min_samples_leaf':[0],'max_leaf_nodes':[0]},
                          'lin_svr':{'C':[0],'epsilon':[0]},
-                         'knn':{'n_neighbors':[0]}})
+                         'knn':{'n_neighbors':[0],'weights':['uniform','distance'],'leaf_size':[0],'metric':['minkowski','euclidean','manhattan'],'p':[0]}})
 
     def feature_selection_model(self,combination_idx=np.arange(4005),do_rfecv=True):
         """

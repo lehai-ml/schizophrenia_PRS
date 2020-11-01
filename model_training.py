@@ -23,7 +23,7 @@ import running_model
 import numpy as np
 import sys
     
-
+import pickle
 
 def save_a_model(model,model_name,split_no,filepath):
     """
@@ -66,7 +66,7 @@ def save_the_object(object,filepath):
 
 def load_the_object(filepath):
     with open(filepath, 'rb') as input:
-        x=pickle.load(filepath)
+        x=pickle.load(input)
     return x
 
 def get_permutation_importances(model,X,y,scoring='neg_mean_squared_error'):
@@ -320,6 +320,7 @@ class scikit_model:
             PIPE_2 (CHECK FEATURE IMPORTANCES)
             '''
             
+            print('I amd doing feature importances')
             
             indices=get_permutation_importances(fine_tuned_estimator,X=X_train_reduced_after_pipe1,y=y_train,scoring='neg_mean_squared_error')#get the indices after permutation testing
             

@@ -144,7 +144,7 @@ def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',c
             continue            
         
         except AttributeError:
-            print('There is no parameters to fine_tune, if this is not the case, please add parameters to the model_training.parameters_dict if that is not correct')
+            print('There is no parameters to fine_tune, if this is not the case, please add parameters to the model_training.parameters_dict if that is not correct \n')
             model.fit(X,y)
             return model
             break
@@ -320,7 +320,7 @@ class scikit_model:
             PIPE_2 (CHECK FEATURE IMPORTANCES)
             '''
             
-            print('I amd doing feature importances')
+            print('I am doing feature importances')
             
             indices=get_permutation_importances(fine_tuned_estimator,X=X_train_reduced_after_pipe1,y=y_train,scoring='neg_mean_squared_error')#get the indices after permutation testing
             
@@ -343,6 +343,9 @@ class scikit_model:
                 model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
                 self.test_scores_across_all_splits.append(model_rmse)
                 
+                with open(self.filepath+'log.txt','a+') as file:
+                    file.write('use the combination after perm for split_no %d \n'%fold_number)
+                
                 continue
             
             print('I am beginning the Recursive Feature Elimination')
@@ -360,11 +363,29 @@ class scikit_model:
             scores_after_rfecv=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_perm),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
             
             self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
+            '''
+            CHECK IF RFECV IMPROVED THE MODEL
+            '''
+            if np.mean(scores_after_perm)>np.mean(scores_after_rfecv):#this is because the scoring is negative mean squared error, so whichever score is higher then the model is better:
+                
+                fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train)
+                y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_perm.reshape(-1)])
+                model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
+                self.test_scores_across_all_splits.append(model_rmse)
+                print('The permutation combination indices are better')
+                
+                with open(self.filepath+'log.txt','a+') as file:
+                    file.write('use the combination after perm for split_no %d \n'%fold_number)
             
-            y_pred=rfecv.estimator.predict(X_test[:,combination_idx_after_rfecv.reshape(-1)])
-            
-            model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
-            self.test_scores_across_all_splits.append(model_rmse)
+            else:
+                
+                y_pred=rfecv.estimator.predict(X_test[:,combination_idx_after_rfecv.reshape(-1)])
+                
+                model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
+                self.test_scores_across_all_splits.append(model_rmse)
+                
+                with open(self.filepath+'log.txt','a+') as file:
+                    file.write('use the combination after rfecv for split_no %d \n'%fold_number)
             
         return self
     

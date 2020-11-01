@@ -226,7 +226,7 @@ class scikit_model:
                          'ridge':{'alpha':np.linspace(200,500,10)},
                          'random_forest':{'n_estimators':[3,10,30],'max_depth':[0],'min_samples_split':[0],'min_samples_leaf':[0],'max_leaf_nodes':[0]},
                          'lin_svr':{'C':[0],'epsilon':[0]},
-                         'knn':{}})
+                         'knn':{'n_neighbors':[0]}})
 
     def feature_selection_model(self,combination_idx=np.arange(4005),do_rfecv=True):
         """
@@ -403,7 +403,7 @@ if __name__ == "__main__":
                 'ridge':Ridge(),
                 'random_forest':RandomForestRegressor(random_state=42,n_jobs=-1),
                 'lin_svr':LinearSVR(),
-                'knn': KNeighborsRegressor()}
+                'knn': KNeighborsRegressor(n_jobs=-1)}
     model_name=input('model name:')
     model=model_dict[model_name]
     filepath=input('filepath:')

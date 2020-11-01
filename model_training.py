@@ -12,8 +12,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold,cross_val_score,GridSearchCV,RandomizedSearchCV, cross_validate
 from sklearn.metrics import mean_squared_error
+from sklearn.inspection import permutation_importance
 
-import joblib
+
+import joblib #to save models
 
 import inspect
 import running_model
@@ -66,6 +68,36 @@ def load_the_object(filepath):
     with open(filepath, 'rb') as input:
         x=pickle.load(filepath)
     return x
+
+def get_permutation_importances(model,X,y,scoring='neg_mean_squared_error'):
+    
+    """
+    __________________________________________________________________________
+    Get permutation importance for each feature. And then return the ones with 
+        the importances above the mean.
+    ___________________________________________________________________________
+    First a baseline metric is caculated from the data X. Then the feature 
+        columns are permuted and the metric is calculated again. The 
+        permutation importance is difference between the baseline metrics and 
+        metric permutating the feature columns
+    
+    Args:
+        model (scikit model):
+        X (np.array):
+        y (np.array): 
+        scoring (str): default 'neg_mean_squared_error'
+        
+    Return:
+        indices: the indices of the feature importances.
+    """
+    
+    result=permutation_importance(model,X,y,scoring=scoring,n_repeats=10,random_state=42)
+    
+    mean_threshold=np.mean(result.importances_mean)
+    
+    indices=np.where(result.importances_mean>=mean_threshold)[0]
+    
+    return indices
     
 
 def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',cv=4,scoring='neg_mean_squared_error'):
@@ -140,7 +172,7 @@ def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',c
         for mean_score, params in zip(cvres['mean_test_score'],cvres['params']):
             print(np.sqrt(-mean_score),params)
         
-        loop_continue=input('Do you want to repeat? (yes/no)')
+        loop_continue=input('Do you want to repeat? (yes/no): ')
         if loop_continue=='no':
             print('which model you want to choose:')# choose from the list the best model
             n=[print(i) for i in [(key,value['search_best_params'],value['best_score']) for key,value in examined_param_grid.items()]]
@@ -229,7 +261,6 @@ class scikit_model:
         Returns:
             saves externally the combination_idx 
             self.cross_validated_scores_after_rfecv
-            self.cross_validated_scores_after_sfm
             self.test_scores_across_all_split
         """
         inner_cv=KFold(n_splits=4,random_state=self.random_state)
@@ -238,8 +269,8 @@ class scikit_model:
 
         fold_number=0
         self.cross_validated_scores_after_rfecv=[]
+        self.cross_validated_scores_after_perm=[]
         self.test_scores_across_all_splits=[]
-        self.cross_validated_scores_after_sfm=[]
 
         for train_index,test_index in outer_cv.split(self.X,self.y):
             
@@ -259,7 +290,11 @@ class scikit_model:
             y_test=scaler_y.transform(y_test.reshape(-1,1))
             #Scaling the data
             
-            pipe1=Pipeline([('featureRed',running_model.FeatureReduction()),('select_percentile',SelectPercentile(f_regression,percentile=20))])#this part is the filtering technique.
+            '''
+            PIPE_1 (FEATURE_REDUCTION [REMOVING LOW VARIANCE AND HIGHLY CORRELATED FEATURES] AND SELECT_PERCENTILE [REMOVE LOW CORRELATED TO THE TARGET FEATURES])
+            '''
+            
+            pipe1=Pipeline([('featureRed',running_model.FeatureReduction()),('select_percentile',SelectPercentile(f_regression,percentile=20))])#this is the filtering technique.
             
             pipe1.fit(X_train,y_train)
             print('I just finished with pipe1 of fold%d'%fold_number)
@@ -271,38 +306,48 @@ class scikit_model:
             save_a_model(pipe1,model_name='pipe1',split_no=fold_number,filepath=self.filepath)
             save_a_npy(combination_idx_after_pipe1,npy_name='combination_idx_after_pipe1',split_no=fold_number,filepath=self.filepath)
             #save the pipe1 and the combination indices.
+            '''
+            FINE-TUNING THE MODEL
+            '''
             print('I am beginning to fine tune')
             fine_tuned_estimator=fine_tune_hyperparameters(param_dict=self.parameters_dict,model=self.model,X=X_train_reduced_after_pipe1,y=y_train,model_name=self.model_name,fine_tune=self.fine_tune,cv=inner_cv)
             #fine-tune hyperparameters of the regression model on the new X_train
             
-            
+
             save_a_model(fine_tuned_estimator,model_name='fine_tuned_estimator',split_no=fold_number,filepath=self.filepath) #save the fine tuned esitmator
             
-            sfm=SelectFromModel(fine_tuned_estimator,prefit=True)
+            '''
+            PIPE_2 (CHECK FEATURE IMPORTANCES)
+            '''
             
-            X_train_reduced_after_sfm2=sfm.transform(X_train_reduced_after_pipe1)
-            combination_idx_after_sfm2=sfm.transform(combination_idx_after_pipe1)
-            save_a_npy(combination_idx_after_sfm2,npy_name='combination_idx_after_sfm2',split_no=fold_number,filepath=self.filepath)
-            #save the new combination_indices after the second filter.
             
-            scores_after_sfm=cross_val_score(sfm.estimator,X_train_reduced_after_sfm2,y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
+            indices=get_permutation_importances(fine_tuned_estimator,X=X_train_reduced_after_pipe1,y=y_train,scoring='neg_mean_squared_error')#get the indices after permutation testing
             
-            self.cross_validated_scores_after_sfm.append(scores_after_sfm)
+            combination_idx_after_perm=combination_idx_after_pipe1[:,indices]
+            X_train_reduced_after_perm=X_train_reduced_after_pipe1[:,indices]
+                
+            save_a_npy(combination_idx_after_perm,npy_name='combination_idx_after_perm',split_no=fold_number,filepath=self.filepath) #save the new combination_indices after the second filter.
+                
+            scores_after_perm=cross_val_score(fine_tuned_estimator,X_train_reduced_after_perm,y_train,scoring='neg_mean_squared_error',cv=inner_cv)#get the estimated performance scores
+                
+            self.cross_validated_scores_after_perm.append(scores_after_perm)
+                
+            
             
             if do_rfecv==False:
                 print('Not doing RFECV')
                 
-                fine_tuned_estimator.fit(X_train_reduced_after_sfm2,y_train)
-                y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_sfm2.reshape(-1)])
+                fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train)
+                y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_perm.reshape(-1)])
                 model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
                 self.test_scores_across_all_splits.append(model_rmse)
                 
                 continue
             
             print('I am beginning the Recursive Feature Elimination')
-            rfecv=RFECV(estimator=sfm.estimator,step=self.step,scoring='neg_mean_squared_error',cv=inner_cv).fit(X_train_reduced_after_sfm2,y_train)
+            rfecv=RFECV(estimator=fine_tuned_estimator,step=self.step,scoring='neg_mean_squared_error',cv=inner_cv).fit(X_train_reduced_after_perm,y_train)
             
-            combination_idx_after_rfecv=rfecv.transform(combination_idx_after_sfm2)
+            combination_idx_after_rfecv=rfecv.transform(combination_idx_after_perm)
             
             save_a_npy(combination_idx_after_rfecv,npy_name='combination_idx_after_rfecv',split_no=fold_number,filepath=self.filepath)
             #save the new combination indices after the final filter.
@@ -310,8 +355,8 @@ class scikit_model:
             save_a_model(rfecv,model_name='rfecv',split_no=fold_number,filepath=self.filepath)
             #save the rfecv model
             print('my RFECV is done for fold %d'%fold_number)
-            rfecv.estimator.fit(rfecv.transform(X_train_reduced_after_sfm2),y_train)
-            scores_after_rfecv=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_sfm2),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
+            rfecv.estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train)
+            scores_after_rfecv=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_perm),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
             
             self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
             
@@ -343,7 +388,7 @@ if __name__ == "__main__":
     # filepath='./'
     fine_tune=input('fine tune (grid/randomized):')
     x=scikit_model(model,X,y,fine_tune=fine_tune,filepath=filepath,model_name=model_name,step=1,random_state=42)
-    do_rfecv=eval(input('Do RFECV?(True/False)'))
+    do_rfecv=eval(input('Do RFECV?(True/False):'))
     x.feature_selection_model(do_rfecv=do_rfecv)
     
     #saving this object for logging purposes

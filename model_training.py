@@ -196,7 +196,7 @@ class scikit_model:
                          'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{}})
 
-    def feature_selection_model(self,combination_idx=np.arange(4005)):
+    def feature_selection_model(self,combination_idx=np.arange(4005),do_rfecv=True):
         """
         ___________________________
         Feature selecting the model
@@ -223,10 +223,13 @@ class scikit_model:
         
         Args:
             combination_idx= the features idx.
+            do_rfecv (bool): Do rfecv (True) if the model does not have 
+                embedded feature selection techniques
         
         Returns:
             saves externally the combination_idx 
-            self.cross_validated_scores_across_all_splits
+            self.cross_validated_scores_after_rfecv
+            self.cross_validated_scores_after_sfm
             self.test_scores_across_all_split
         """
         inner_cv=KFold(n_splits=4,random_state=self.random_state)
@@ -234,8 +237,9 @@ class scikit_model:
         #create inner and outer folds
 
         fold_number=0
-        self.cross_validated_scores_across_all_splits=[]
+        self.cross_validated_scores_after_rfecv=[]
         self.test_scores_across_all_splits=[]
+        self.cross_validated_scores_after_sfm=[]
 
         for train_index,test_index in outer_cv.split(self.X,self.y):
             
@@ -280,6 +284,21 @@ class scikit_model:
             combination_idx_after_sfm2=sfm.transform(combination_idx_after_pipe1)
             save_a_npy(combination_idx_after_sfm2,npy_name='combination_idx_after_sfm2',split_no=fold_number,filepath=self.filepath)
             #save the new combination_indices after the second filter.
+            
+            scores_after_sfm=cross_val_score(sfm.estimator,X_train_reduced_after_sfm2,y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
+            
+            self.cross_validated_scores_after_sfm.append(scores_after_sfm)
+            
+            if do_rfecv==False:
+                print('Not doing RFECV')
+                
+                fine_tuned_estimator.fit(X_train_reduced_after_sfm2,y_train)
+                y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_sfm2.reshape(-1)])
+                model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
+                self.test_scores_across_all_splits.append(model_rmse)
+                
+                continue
+            
             print('I am beginning the Recursive Feature Elimination')
             rfecv=RFECV(estimator=sfm.estimator,step=self.step,scoring='neg_mean_squared_error',cv=inner_cv).fit(X_train_reduced_after_sfm2,y_train)
             
@@ -292,9 +311,9 @@ class scikit_model:
             #save the rfecv model
             print('my RFECV is done for fold %d'%fold_number)
             rfecv.estimator.fit(rfecv.transform(X_train_reduced_after_sfm2),y_train)
-            scores=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_sfm2),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
+            scores_after_rfecv=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_sfm2),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
             
-            self.cross_validated_scores_across_all_splits.append(scores)
+            self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
             
             y_pred=rfecv.estimator.predict(X_test[:,combination_idx_after_rfecv.reshape(-1)])
             
@@ -302,14 +321,13 @@ class scikit_model:
             self.test_scores_across_all_splits.append(model_rmse)
             
         return self
-        
-        
+    
 if __name__ == "__main__":
     
     from sklearn.linear_model import LinearRegression, Lasso, Ridge
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.svm import LinearSVR
-    
+    from sklearn.neighbors import KNeighborsRegressor
     
     X=np.load(sys.argv[1])
     y=np.load(sys.argv[2])
@@ -317,14 +335,16 @@ if __name__ == "__main__":
                 'lasso':Lasso(),
                 'ridge':Ridge(),
                 'random_forest':RandomForestRegressor(random_state=42,n_jobs=-1),
-                'lin_svr':LinearSVR()}
+                'lin_svr':LinearSVR(),
+                'knn': KNeighborsRegressor()}
     model_name=input('model name:')
     model=model_dict[model_name]
     filepath=input('filepath:')
     # filepath='./'
     fine_tune=input('fine tune (grid/randomized):')
     x=scikit_model(model,X,y,fine_tune=fine_tune,filepath=filepath,model_name=model_name,step=1,random_state=42)
-    x.feature_selection_model()
+    do_rfecv=eval(input('Do RFECV?(True/False)'))
+    x.feature_selection_model(do_rfecv=do_rfecv)
     
     #saving this object for logging purposes
 

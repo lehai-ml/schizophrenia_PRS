@@ -7,13 +7,14 @@ warnings.simplefilter(action='ignore', category=Warning)
 
 
 from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectFromModel,SelectPercentile,f_regression,RFECV
+from sklearn.feature_selection import SelectFromModel, SelectPercentile, f_regression, RFECV
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import KFold,cross_val_score,GridSearchCV,RandomizedSearchCV, cross_validate
+from sklearn.model_selection import KFold, cross_val_score, GridSearchCV, RandomizedSearchCV, cross_validate
 from sklearn.metrics import mean_squared_error
 from sklearn.inspection import permutation_importance
 
+from mlxtend.feature_selection import SequentialFeatureSelector as SFS
 
 import joblib #to save models
 
@@ -39,10 +40,10 @@ def save_a_model(model,model_name,split_no,filepath):
     Return:
         saves the model externally
     """
-    filepath=filepath+'split_'+str(split_no)+model_name+'.pkl'
-    return joblib.dump(model,filepath)
+    filepath = filepath+'split_'+str(split_no)+model_name+'.pkl'
+    return joblib.dump(model, filepath)
 
-def save_a_npy(npy_array,npy_name,split_no,filepath):
+def save_a_npy(npy_array, npy_name, split_no, filepath):
     """
     ______________________________________________________
     Save the numpy array in binary format externally
@@ -56,20 +57,20 @@ def save_a_npy(npy_array,npy_name,split_no,filepath):
     Return:
         saves the array in binary format externally
     """
-    filepath=filepath+'split_'+str(split_no)+npy_name+'.npy'
-    return np.save(filepath,npy_array)
+    filepath = filepath+'split_'+str(split_no)+npy_name+'.npy'
+    return np.save(filepath, npy_array)
 
-def save_the_object(object,filepath):
+def save_the_object(object, filepath):
     
-    with open(filepath,'wb') as output:
-        pickle.dump(object,output,pickle.HIGHEST_PROTOCOL)
+    with open(filepath, 'wb') as output:
+        pickle.dump(object, output, pickle.HIGHEST_PROTOCOL)
 
 def load_the_object(filepath):
     with open(filepath, 'rb') as input:
-        x=pickle.load(input)
+        x = pickle.load(input)
     return x
 
-def get_permutation_importances(model,X,y,scoring='neg_mean_squared_error'):
+def get_permutation_importances(model, X, y, scoring='neg_mean_squared_error'):
     
     """
     __________________________________________________________________________
@@ -84,23 +85,23 @@ def get_permutation_importances(model,X,y,scoring='neg_mean_squared_error'):
     Args:
         model (scikit model):
         X (np.array):
-        y (np.array): 
+        y (np.array):
         scoring (str): default 'neg_mean_squared_error'
         
     Return:
         indices: the indices of the feature importances.
     """
     
-    result=permutation_importance(model,X,y,scoring=scoring,n_repeats=10,random_state=42)
+    result = permutation_importance(model, X, y, scoring=scoring, n_repeats=10, random_state=42)
     
-    mean_threshold=np.mean(result.importances_mean)
-    
-    indices=np.where(result.importances_mean>=mean_threshold)[0]
-    
-    return indices
-    
+    mean_threshold = np.mean(result.importances_mean)
 
-def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',cv=4,scoring='neg_mean_squared_error'):
+    indices = np.where(result.importances_mean >= mean_threshold)[0]
+
+    return indices
+
+
+def fine_tune_hyperparameters(param_dict, model, X, y, model_name, fine_tune='grid', cv=4, scoring='neg_mean_squared_error'):
     """
     ______________________________________________________
     Manual Fine tuning of hyperparameters
@@ -141,8 +142,8 @@ def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',c
             
         except SyntaxError:
             print('try again')
-            continue            
-        
+            continue
+
         except AttributeError:
             print('There is no parameters to fine_tune, if this is not the case, please add parameters to the model_training.parameters_dict if that is not correct \n')
             model.fit(X,y)
@@ -179,6 +180,131 @@ def fine_tune_hyperparameters(param_dict,model,X,y,model_name,fine_tune='grid',c
             the_model_i_want=eval(input('select a model number'))
             return examined_param_grid[the_model_i_want]['search_model_best_estimator']
             break
+
+def performing_rfecv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring='neg_mean_squared_error'):
+    """
+    ___________________________________________________
+    Performing scikit recursive feature elimination CV.
+    ___________________________________________________
+    Args:
+        model (scikit-model): scikit object            
+        X (np.asarray): Training dataset
+        y (np.asarray): label target
+        combination_idx (np.array): feature indices of the X.
+        split_no (int):
+        filepath (str):
+        cv (cross-validated)
+        scoring (str)
+        
+    Returns:
+        rfecv (rfecv scikit object)
+        rfecv_estimator: fitted rfecv estimator
+        combination_idx_after_rfecv
+        scores_after_rfecv
+        
+    ============================================================================
+    Notes:
+    
+    Here, we implement the use of Recursive Feature Elimination. It utilises the underlying coef_ or feature_importance attributes of the model. It ranks the features by their estimated coefficients, and removes the weakest ones once the specified number of feature is reached. Cross-validation is used to score different feature subsets and select the best scoring collection of features. 
+    
+    ============================================================================
+    """
+    
+    print('I am beginning the Recursive Feature Elimination')
+    
+    rfecv=RFECV(estimator=model,step=step,scoring=scoring,cv=cv).fit(X,y)
+    
+    combination_idx_after_rfecv=rfecv.transform(combination_idx)
+    
+    save_a_npy(combination_idx_after_rfecv,npy_name='combination_idx_after_rfecv',split_no=split_no,filepath=filepath)
+    #save the new combination indices after the final filter.
+    
+    save_a_model(rfecv,model_name='rfecv',split_no=split_no,filepath=filepath)
+    #save the rfecv model
+    
+    print('my RFECV is done for fold %d'%split_no)
+    rfecv_estimator=rfecv.estimator
+    rfecv_estimator.fit(rfecv.transform(X),y)
+    scores_after_rfecv=cross_val_score(rfecv_estimator,rfecv.transform(X),y,scoring=scoring,cv=cv) #get the estimated performance scores
+    
+    return rfecv, rfecv_estimator, combination_idx_after_rfecv,scores_after_rfecv
+
+
+def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring='neg_mean_squared_error'):
+    
+    """
+    ___________________________________________________
+    Performing mlxtend Sequential Feature Selector CV.
+    ___________________________________________________
+    Args:
+        model (scikit-model): scikit object            
+        X (np.asarray): Training dataset
+        y (np.asarray): label target
+        combination_idx (np.array): feature indices of the X.
+        split_no (int):
+        filepath (str):
+        cv (cross-validated)
+        scoring (str)
+        
+    Returns:
+        sfscv (sfscv scikit object)
+        sfscv_estimator: fitted sfscv estimator
+        combination_idx_after_sfscv
+        scores_after_sfscv
+    ============================================================================
+    Notes:
+    
+    Here, we implement the use of Sequential Feature Selector. 
+    In a greedy fashion, we remove one feature at a time (forward=False), and 
+    choose the subset that yields the best model with the best 
+    scoring (scoring='neg_mean_squared_error') metrics in all cross-validation 
+    splits. We also allow for conditional inclusion (floating=True), if any of 
+    the removed feature if included back, can improve the model.
+    Instead of setting a priori number of feature, we choose the subset that yileds the best score (k_features='best')
+    
+    ============================================================================
+    
+    
+    """
+    
+    print('I am beginning the Sequential Feature Selector \n')
+    print('=================================================')
+    
+    sfscv=SFS(model,k_features='best',forward=False,floating=True,verbose=1,scoring=scoring,cv=cv,n_jobs=-1)
+    
+    combination_idx_after_sfscv=SFS.transform(combination_idx)
+    
+    save_a_npy(combination_idx_after_sfscv,npy_name='combination_idx_after_sfscv',split_no=split_no,filepath=filepath)
+    #save the new combination indices after the final filter.
+    
+    save_a_model(sfscv,model_name='sfscv',split_no=split_no,filepath=filepath)
+    #save the sfscv model
+    
+    print('my SFSCV is done for fold %d'%split_no)
+    sfscv_estimator=sfscv.estimator
+    sfscv_estimator.fit(sfscv.transform(X),y)
+    scores_after_sfscv=cross_val_score(sfscv_estimator,sfscv.transform(X),y,scoring=scoring,cv=cv) #get the estimated performance scores
+    
+    return sfscv, sfscv_estimator, combination_idx_after_sfscv,scores_after_sfscv
+
+def get_the_best_model(X_test,y_test,filepath,fold_number,*args):
+    """
+    ___________________________
+    args: best_model_key,best_model,cv_score,combination_idx_array
+    
+    CHECK IF FEATURE PRUNING IMPROVED THE MODEL
+    ___________________________
+    """
+    
+    best_model_key,best_model,cv_score,combination_idx_array=max(args,key=operator.itemgetter(2))
+    with open(filepath+'log.txt','a+') as file:
+        file.write('use the combination after %s for split_no %d \n'%(best_model_key,fold_number))
+    
+    y_pred=best_model.predict(X_test[:,combination_idx_array.reshape(-1)])
+    model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
+    
+    return model_rmse
+
 
 class scikit_model:
     """
@@ -228,7 +354,7 @@ class scikit_model:
                          'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{'n_neighbors':[0],'weights':['uniform','distance'],'leaf_size':[0],'metric':['minkowski','euclidean','manhattan'],'p':[0]}})
 
-    def feature_selection_model(self,combination_idx=np.arange(4005),do_rfecv=True):
+    def feature_selection_model(self,combination_idx=np.arange(4005),do_feature_pruning='both'):
         """
         ___________________________
         Feature selecting the model
@@ -247,16 +373,21 @@ class scikit_model:
         
         Fourth, GridSearch (if fine_tune='grid') or RandomSearch is applied to 
             find the best hyperparameters. The results were passed to a 
-            SelectFromModel to select for the highest "feature_importance" or 
-            "coef_" features, as defined by the model.
-            
-        Fifth, the model is then passed to the RFECV, to prune the rest of the 
+            feature permutation importance to select for the most important 
             features.
+            
+        Fifth, the model is then passed to the recursive feature elimination or 
+            Sequential Feature Selector, to prune the rest of the features. See 
+            mlxtend.feature_selection.SequentialFeatureSelector for more 
+            information. (sklearn v. 0.24 will start implementing this function)
         
         Args:
             combination_idx= the features idx.
-            do_rfecv (bool): Do rfecv (True) if the model does not have 
-                embedded feature selection techniques
+            do_feature_pruning (str): 'both' : do both Recursive Feature 
+            elimination and SequentialFeatureSelector. Output CV score for both 
+            and compare them with feature permutation importance step.
+            'rfecv': Do only rfecv or 'sfs': do only sfs.
+            'none' for neither.
         
         Returns:
             saves externally the combination_idx 
@@ -269,6 +400,7 @@ class scikit_model:
 
         fold_number=0
         self.cross_validated_scores_after_rfecv=[]
+        self.cross_validated_scores_after_sfscv=[]
         self.cross_validated_scores_after_perm=[]
         self.test_scores_across_all_splits=[]
 
@@ -333,10 +465,12 @@ class scikit_model:
                 
             self.cross_validated_scores_after_perm.append(scores_after_perm)
                 
+            '''
+            The cross-validated feature permutation importance is finished. Check if I want to do feature elimination (RFE vs. SFS or both)
+            '''
             
-            
-            if do_rfecv==False:
-                print('Not doing RFECV')
+            if do_feature_pruning=='none':
+                print('Not doing feature elimination')
                 
                 fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train)
                 y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_perm.reshape(-1)])
@@ -348,44 +482,41 @@ class scikit_model:
                 
                 continue
             
-            print('I am beginning the Recursive Feature Elimination')
-            rfecv=RFECV(estimator=fine_tuned_estimator,step=self.step,scoring='neg_mean_squared_error',cv=inner_cv).fit(X_train_reduced_after_perm,y_train)
-            
-            combination_idx_after_rfecv=rfecv.transform(combination_idx_after_perm)
-            
-            save_a_npy(combination_idx_after_rfecv,npy_name='combination_idx_after_rfecv',split_no=fold_number,filepath=self.filepath)
-            #save the new combination indices after the final filter.
-            
-            save_a_model(rfecv,model_name='rfecv',split_no=fold_number,filepath=self.filepath)
-            #save the rfecv model
-            print('my RFECV is done for fold %d'%fold_number)
-            rfecv.estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train)
-            scores_after_rfecv=cross_val_score(rfecv.estimator,rfecv.transform(X_train_reduced_after_perm),y_train,scoring='neg_mean_squared_error',cv=inner_cv) #get the estimated performance scores
-            
-            self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
-            '''
-            CHECK IF RFECV IMPROVED THE MODEL
-            '''
-            if np.mean(scores_after_perm)>np.mean(scores_after_rfecv):#this is because the scoring is negative mean squared error, so whichever score is higher then the model is better:
+            elif do_feature_pruning=='both':
                 
-                fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train)
-                y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_perm.reshape(-1)])
-                model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
-                self.test_scores_across_all_splits.append(model_rmse)
-                print('The permutation combination indices are better')
+                rfecv, rfecv_estimator, combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(fine_tuned_estimator,X_train_reduced_after_perm,y_train,step=self.step,combination_idx=combination_idx_after_perm,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='neg_mean_squared_error')
                 
-                with open(self.filepath+'log.txt','a+') as file:
-                    file.write('use the combination after perm for split_no %d \n'%fold_number)
+                sfscv, sfscv_estimator, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(fine_tuned_estimator,X_train_reduced_after_perm,y_train,step=self.step,combination_idx=combination_idx_after_perm,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='neg_mean_squared_error')
+                
+                self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
+                self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
             
-            else:
-                
-                y_pred=rfecv.estimator.predict(X_test[:,combination_idx_after_rfecv.reshape(-1)])
-                
-                model_rmse=np.sqrt(mean_squared_error(y_test,y_pred))
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('rfecv',rfecv_estimator,np.mean(scores_after_rfecv),combination_idx_after_rfecv),('sfscv',sfscv_estimator,scores_after_sfscv,combination_idx_after_sfscv)))
                 self.test_scores_across_all_splits.append(model_rmse)
                 
-                with open(self.filepath+'log.txt','a+') as file:
-                    file.write('use the combination after rfecv for split_no %d \n'%fold_number)
+                continue
+            
+            elif do_feature_pruning=='rfecv':
+                rfecv, rfecv_estimator, combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(fine_tuned_estimator,X_train_reduced_after_perm,y_train,step=self.step,combination_idx=combination_idx_after_perm,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='neg_mean_squared_error')
+                
+                self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
+                
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('rfecv',rfecv_estimator,np.mean(scores_after_rfecv),combination_idx_after_rfecv)))
+                
+                self.test_scores_across_all_splits.append(model_rmse)
+                
+                continue
+            
+            elif do_feature_pruning=='sfscv':
+                sfscv, sfscv_estimator, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(fine_tuned_estimator,X_train_reduced_after_perm,y_train,step=self.step,combination_idx=combination_idx_after_perm,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='neg_mean_squared_error')
+                
+                self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
+                  
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('sfscv',sfscv_estimator,scores_after_sfscv,combination_idx_after_sfscv)))
+                
+                self.test_scores_across_all_splits.append(model_rmse)
+                
+                continue
             
         return self
     

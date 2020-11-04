@@ -541,8 +541,8 @@ if __name__ == "__main__":
     # filepath='./'
     fine_tune=input('fine tune (grid/randomized):')
     x=scikit_model(model,X,y,fine_tune=fine_tune,filepath=filepath,model_name=model_name,step=1,random_state=42)
-    do_rfecv=eval(input('Do RFECV?(True/False):'))
-    x.feature_selection_model(do_rfecv=do_rfecv)
+    do_feature_pruning=input('Do feature prunning?(none,both,rfecv,sfscv):')
+    x.feature_selection_model(do_feature_pruning=do_feature_pruning)
     
     #saving this object for logging purposes
 

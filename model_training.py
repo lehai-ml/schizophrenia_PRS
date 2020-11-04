@@ -492,7 +492,10 @@ class scikit_model:
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
             
-                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('rfecv',rfecv_estimator,np.mean(scores_after_rfecv),combination_idx_after_rfecv),('sfscv',sfscv_estimator,np.mean(scores_after_sfscv),combination_idx_after_sfscv))
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,
+                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
+                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),combination_idx_after_rfecv),
+                                               ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),combination_idx_after_sfscv))
                 self.test_scores_across_all_splits.append(model_rmse)
                 
                 continue
@@ -502,7 +505,9 @@ class scikit_model:
                 
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
                 
-                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('rfecv',rfecv_estimator,np.mean(scores_after_rfecv),combination_idx_after_rfecv))
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,
+                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
+                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),combination_idx_after_rfecv))
                 
                 self.test_scores_across_all_splits.append(model_rmse)
                 
@@ -513,7 +518,9 @@ class scikit_model:
                 
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
                   
-                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('sfscv',sfscv_estimator,np.mean(scores_after_sfscv),combination_idx_after_sfscv))
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,
+                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
+                                               ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),combination_idx_after_sfscv))
                 
                 self.test_scores_across_all_splits.append(model_rmse)
                 

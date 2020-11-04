@@ -25,6 +25,7 @@ import numpy as np
 import sys
     
 import pickle
+import operator
 
 def save_a_model(model,model_name,split_no,filepath):
     """
@@ -270,6 +271,7 @@ def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     print('I am beginning the Sequential Feature Selector \n')
     
     sfscv=SFS(model,k_features='best',forward=False,floating=True,verbose=1,scoring=scoring,cv=cv,n_jobs=-1)
+    sfscv.fit(X,y)
     
     combination_idx_after_sfscv=sfscv.transform(combination_idx)
     
@@ -490,7 +492,7 @@ class scikit_model:
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
             
-                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('rfecv',rfecv_estimator,np.mean(scores_after_rfecv),combination_idx_after_rfecv),('sfscv',sfscv_estimator,scores_after_sfscv,combination_idx_after_sfscv)))
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('rfecv',rfecv_estimator,np.mean(scores_after_rfecv),combination_idx_after_rfecv),('sfscv',sfscv_estimator,np.mean(scores_after_sfscv),combination_idx_after_sfscv)))
                 self.test_scores_across_all_splits.append(model_rmse)
                 
                 continue
@@ -511,7 +513,7 @@ class scikit_model:
                 
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
                   
-                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('sfscv',sfscv_estimator,scores_after_sfscv,combination_idx_after_sfscv)))
+                model_rmse= get_the_best_model(X_test,y_test,self.filepath,fold_number,(('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),('sfscv',sfscv_estimator,np.mean(scores_after_sfscv),combination_idx_after_sfscv)))
                 
                 self.test_scores_across_all_splits.append(model_rmse)
                 

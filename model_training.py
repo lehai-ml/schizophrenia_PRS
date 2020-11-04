@@ -268,11 +268,10 @@ def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     """
     
     print('I am beginning the Sequential Feature Selector \n')
-    print('=================================================')
     
     sfscv=SFS(model,k_features='best',forward=False,floating=True,verbose=1,scoring=scoring,cv=cv,n_jobs=-1)
     
-    combination_idx_after_sfscv=SFS.transform(combination_idx)
+    combination_idx_after_sfscv=sfscv.transform(combination_idx)
     
     save_a_npy(combination_idx_after_sfscv,npy_name='combination_idx_after_sfscv',split_no=split_no,filepath=filepath)
     #save the new combination indices after the final filter.

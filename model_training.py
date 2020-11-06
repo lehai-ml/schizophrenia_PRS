@@ -417,7 +417,7 @@ class scikit_model:
             
             'Pipe1: REMOVE LOW VARIANCES and PERFORM STANDARD SCALER'
             print('starting pipe-1 for fold %d '%fold_number)
-            pipe1=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),('std_scaler',model_training.StandardScaler())])
+            pipe1=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),('std_scaler',StandardScaler())])
             
             X_train=pipe1.fit_transform(X_train)
             X_test=pipe1.transform(X_test)

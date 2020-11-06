@@ -139,6 +139,15 @@ def adjusting_for_covariates_with_lin_reg(y,covariates=([])):
     new_feature=y-y_pred
     return new_feature
 
+def common_features_across_all_splits(n=4,axis=1,*args):
+    """
+    Find common features across all splits
+    Args:
+        n(int): number of repetition across 5 splits
+        *args: the combination indices returned by the 5 splits. in 2D array.
+    """
+    unique_idx,unique_counts=np.unique(np.concatenate(args,axis=axis),return_counts=True)
+    return unique_idx[np.where(unique_counts>n)]
 
 class ROIs_combo:
     """

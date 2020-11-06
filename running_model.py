@@ -6,7 +6,7 @@ This custom file contains functions to run scikit-learn preprocessing pipelines
 #Scikit-lib
 from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import VarianceThreshold,SelectorMixin
 
 #Network visualisation and algorithm
 import networkx as nx
@@ -165,24 +165,71 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
         
         return combination_index
 
-class FeatureReduction(BaseEstimator,TransformerMixin):
+class Low_Variance_Remover(BaseEstimator,SelectorMixin):
+    """
+    This will handle the removal of low variances
+    """
+    def __init__(self,variance_percent=0):
+        """
+        Initialize the object:
+        variance_percent (float): the percentage of the variance to be 
+                removed.
+        """
+        self.variance_percent=variance_percent
+    
+    def fit(self,X,y=None):
+        
+        """
+        ______________________________
+        Fitting the the transformer.
+        ______________________________
+        Args:
+            X: 2D dataset of features.
+            y: 1D vector of the target.
+        
+        Return
+            self.variance_transformer: VarianceThreshold() with new threshold
+            self.corr_idx
+        """
+        self.variance_transformer=lowest_percent_variance(percent=self.variance_percent,variance_object=VarianceThreshold().fit(X))
+        
+        self.variance_idx=np.where(self.variance_transformer.get_support())[0]#get variance transformed feature idx.
+        return self
+    
+    def transform(self,X,y=None):
+        """
+        ______________________________
+        Transforming the dataset.
+        ______________________________
+        Args:
+            X: 2D dataset of features.
+            y(optional): 1D vector of the target.
+        
+        Return
+            new_X: transformed X
+        """
+        new_X=X[:,self.variance_idx]
+        return new_X
+
+    def _get_support_mask(self):
+        return self.variance_transformer.get_support()
+        
+
+class High_Corr_Remover(BaseEstimator,TransformerMixin):
     
     '''
     This will handle all the feature reduction transformation of the dataset.
     '''
-    def __init__(self,variance_percent=.2,thresh=0.8,met='elimination'):
+    def __init__(self,thresh=0.8,met='elimination'):
         
         """
         Initialize the object
         Args:
-            variance_percent (float): the percentage of the variance to be 
-                removed.
             thresh (float): the correlation threshold to be removed.
             met (str): the method of removing correlated features. Greedy 
                 'elimination' (Default) or greedy modularity 'maximization'.
                 
         Attributes:
-            self.variance_percent
             self.thresh
             self.met
         """
@@ -203,15 +250,10 @@ class FeatureReduction(BaseEstimator,TransformerMixin):
             y: 1D vector of the target.
         
         Return
-            self.variance_transformer: VarianceThreshold() with new threshold
             self.corr_idx
         """
-        
-        self.variance_transformer=lowest_percent_variance(percent=self.variance_percent,variance_object=VarianceThreshold().fit(X))
-        
-        variance_idx=np.where(self.variance_transformer.get_support())[0]#get variance transformed feature idx.
                  
-        self.corr_idx=remove_correlated_features(X=X[:,variance_idx],y=y,combination_index=variance_idx,thresh=self.thresh,met=self.met)
+        self.corr_idx=remove_correlated_features(X=X,y=y,combination_index=np.arange(X.shape[1]),thresh=self.thresh,met=self.met)
         
         return self
     

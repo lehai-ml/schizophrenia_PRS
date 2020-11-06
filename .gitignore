@@ -11,7 +11,12 @@ Tracts/
 test/
 *.npy
 *.pkl
-
+ridge/
+lasso/
+lin_svr/
+lin_reg/
+knn/
+random_forest/
 .ipynb_checkpoints/
 
 
@@ -136,3 +141,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+pipeline.pptx
+ePrime_nosibs_european_pruned_excludeLD_pca10.eigenvec.txt py38-env.txt scz2_sixlevels_ld1000G.highres.all.score.txt
+py38-env.txt

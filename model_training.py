@@ -356,7 +356,7 @@ class scikit_model:
                          'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{'n_neighbors':[int(i) for i in np.linspace(1,20,20)],'weights':['uniform','distance'],'leaf_size':[0],'metric':['minkowski','euclidean','manhattan'],'p':[0]}})
 
-    def feature_selection_model(self,combination_idx=np.arange(4005),do_feature_pruning='both'):
+    def feature_selection_model(self,do_feature_pruning='both'):
         """
         ___________________________
         Feature selecting the model
@@ -430,7 +430,7 @@ class scikit_model:
                 y_train=y_train.ravel()
                 y_test=y_test.ravel()
             
-            combination_idx_after_pipe1=pipe1.transform(combination_idx.reshape(1,-1))
+            combination_idx_after_pipe1=np.where(pipe1.named_steps['lvr'].get_support())[0]
             
             save_a_model(pipe1,model_name='pipe1',split_no=fold_number,filepath=self.filepath)
             save_a_npy(combination_idx_after_pipe1,npy_name='combination_idx_after_pipe1',split_no=fold_number,filepath=self.filepath)
@@ -445,7 +445,7 @@ class scikit_model:
             print('I just finished with pipe2 of fold%d'%fold_number)
             
             X_train_reduced_after_pipe2=pipe2.transform(X_train)
-            combination_idx_after_pipe2=pipe2.transform(combination_idx_after_pipe1)
+            combination_idx_after_pipe2=pipe2.transform(combination_idx_after_pipe1.reshape(1,-1))
 
             #we get new_combinations_after this step
             
@@ -478,7 +478,10 @@ class scikit_model:
             scores_after_perm=cross_val_score(fine_tuned_estimator,X_train_reduced_after_perm,y_train,scoring='r2',cv=inner_cv)#get the estimated performance scores
                 
             self.cross_validated_scores_after_perm.append(scores_after_perm)
-                
+            
+            with open(self.filepath+'score_log.txt','a+') as file:
+                file.write('cross_val_score_after_perm for split %d is:'%fold_number,scores_after_perm)
+            
             '''
             The cross-validated feature permutation importance is finished. Check if I want to do feature elimination (RFE vs. SFS or both)
             '''
@@ -493,7 +496,8 @@ class scikit_model:
                 
                 with open(self.filepath+'log.txt','a+') as file:
                     file.write('use the combination after perm for split_no %d \n'%fold_number)
-                
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('test score for split %d is:'%fold_number,model_r2)
                 continue
             
             elif do_feature_pruning=='both':
@@ -504,39 +508,50 @@ class scikit_model:
                 
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('cross_val_score_after_rfecv for split %d is:'%fold_number,scores_after_rfecv)
+                    file.write('cross_val_score_after_sfscv for split %d is:'%fold_number,scores_after_sfscv)
             
                 model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
                                                ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),combination_idx_after_rfecv),
                                                ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),combination_idx_after_sfscv))
                 self.test_scores_across_all_splits.append(model_r2)
-                
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('test score for split %d is:'%fold_number,model_r2)
                 continue
             
             elif do_feature_pruning=='rfecv':
                 rfecv, rfecv_estimator, combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(fine_tuned_estimator,X_train_reduced_after_perm,y_train,step=self.step,combination_idx=combination_idx_after_perm,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
                 
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('cross_val_score_after_rfecv for split %d is:'%fold_number,scores_after_rfecv)
                 
                 model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
                                                ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),combination_idx_after_rfecv))
                 
                 self.test_scores_across_all_splits.append(model_r2)
-                
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('test score for split %d is:'%fold_number,model_r2)
                 continue
             
             elif do_feature_pruning=='sfscv':
                 sfscv, sfscv_estimator, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(fine_tuned_estimator,X_train_reduced_after_perm,y_train,step=self.step,combination_idx=combination_idx_after_perm,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
                 
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('cross_val_score_after_sfscv for split %d is:'%fold_number,scores_after_sfscv)
                   
                 model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
                                                ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),combination_idx_after_sfscv))
                 
                 self.test_scores_across_all_splits.append(model_r2)
-                
+                with open(self.filepath+'score_log.txt','a+') as file:
+                    file.write('test score for split %d is:'%fold_number,model_r2)
+                    
                 continue
             
         return self

@@ -289,7 +289,7 @@ def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     
     return sfscv, sfscv_estimator, combination_idx_after_sfscv,scores_after_sfscv
 
-def get_the_best_model(X_test,y_test,filepath,fold_number,*args):
+def get_the_best_model(y_test,filepath,fold_number,*args):
     """
     ___________________________
     args: best_model_key,best_model,cv_score,combination_idx_array
@@ -298,15 +298,20 @@ def get_the_best_model(X_test,y_test,filepath,fold_number,*args):
     ___________________________
     """
     
-    best_model_key,best_model,cv_score,combination_idx_array=max(args,key=operator.itemgetter(2))
+    best_model_key,best_model_estimator,cv_score,X_test=max(args,key=operator.itemgetter(2))
     with open(filepath+'log.txt','a+') as file:
         file.write('use the combination after %s for split_no %d \n'%(best_model_key,fold_number))
     
-    y_pred=best_model.predict(X_test[:,combination_idx_array.reshape(-1)])
+    y_pred=best_model_estimator.predict(X_test)
     model_r2=r2_score(y_test,y_pred)
     
     return model_r2
 
+def transforming_test_set(X_test,pipe1,pipe2,permutation_indices):
+    X_test_after_pipe1 = pipe1.transform(X_test)
+    X_test_after_pipe2 = pipe2.transform(X_test_after_pipe1)
+    X_test_after_perm = X_test_after_pipe2[:,permutation_indices]
+    return X_test_after_perm
 
 class scikit_model:
     """
@@ -420,7 +425,7 @@ class scikit_model:
             pipe1=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),('std_scaler',StandardScaler())])
             
             X_train=pipe1.fit_transform(X_train)
-            X_test=pipe1.transform(X_test)
+        
             
             scaler_y=StandardScaler()
             y_train=scaler_y.fit_transform(y_train.reshape(-1,1))
@@ -468,10 +473,10 @@ class scikit_model:
             
             print('I am doing feature importances')
             
-            indices=get_permutation_importances(fine_tuned_estimator,X=X_train_reduced_after_pipe2,y=y_train,scoring='r2')#get the indices after permutation testing
+            permutation_indices=get_permutation_importances(fine_tuned_estimator,X=X_train_reduced_after_pipe2,y=y_train,scoring='r2')#get the indices after permutation testing
             
-            combination_idx_after_perm=combination_idx_after_pipe2[:,indices]
-            X_train_reduced_after_perm=X_train_reduced_after_pipe2[:,indices]
+            combination_idx_after_perm=combination_idx_after_pipe2[:,permutation_indices]
+            X_train_reduced_after_perm=X_train_reduced_after_pipe2[:,permutation_indices]
                 
             save_a_npy(combination_idx_after_perm,npy_name='combination_idx_after_perm',split_no=fold_number,filepath=self.filepath) #save the new combination_indices after the second filter.
                 
@@ -485,12 +490,12 @@ class scikit_model:
             '''
             The cross-validated feature permutation importance is finished. Check if I want to do feature elimination (RFE vs. SFS or both)
             '''
-            
+            X_test_after_perm=transforming_test_set(X_test,pipe1,pipe2,permutation_indices)
             if do_feature_pruning=='none':
                 print('Not doing feature elimination')
                 
                 fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train)
-                y_pred=fine_tuned_estimator.predict(X_test[:,combination_idx_after_perm.reshape(-1)])
+                y_pred=fine_tuned_estimator.predict(X_test_after_perm)
                 model_r2=r2_score(y_test,y_pred)
                 self.test_scores_across_all_splits.append(model_r2)
                 
@@ -512,10 +517,10 @@ class scikit_model:
                     file.write('cross_val_score_after_rfecv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_rfecv])))
                     file.write('cross_val_score_after_sfscv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_sfscv])))
             
-                model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
-                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
-                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),combination_idx_after_rfecv),
-                                               ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),combination_idx_after_sfscv))
+                model_r2= get_the_best_model(y_test,self.filepath,fold_number,
+                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),X_test_after_perm),
+                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),rfecv.transform(X_test_after_perm)),
+                                               ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),sfscv.transform(X_test_after_perm)))
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
                     file.write('test score for split %d is: %s'%(fold_number,','.join([str(i) for i in model_r2])))
@@ -528,9 +533,9 @@ class scikit_model:
                 with open(self.filepath+'score_log.txt','a+') as file:
                     file.write('cross_val_score_after_rfecv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_rfecv])))
                     
-                model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
-                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
-                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),combination_idx_after_rfecv))
+                model_r2= get_the_best_model(y_test,self.filepath,fold_number,
+                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),X_test_after_perm),
+                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),rfecv.transform(X_test_after_perm)))
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
@@ -544,9 +549,9 @@ class scikit_model:
                 with open(self.filepath+'score_log.txt','a+') as file:
                     file.write('cross_val_score_after_sfscv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_sfscv])))
                   
-                model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
-                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),combination_idx_after_perm),
-                                               ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),combination_idx_after_sfscv))
+                model_r2= get_the_best_model(y_test,self.filepath,fold_number,
+                                               ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),X_test_after_perm),
+                                               ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),sfscv.transform(X_test_after_perm)))
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:

@@ -502,7 +502,7 @@ class scikit_model:
                 with open(self.filepath+'log.txt','a+') as file:
                     file.write('use the combination after perm for split_no %d \n'%fold_number)
                 with open(self.filepath+'score_log.txt','a+') as file:
-                    file.write('test score for split %d is: %s'%(fold_number,','.join([str(i) for i in model_r2])))
+                    file.write('test score for split %d is: %s'%(fold_number,str(model_r2)))
                 continue
             
             elif do_feature_pruning=='both':
@@ -523,7 +523,7 @@ class scikit_model:
                                                ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),sfscv.transform(X_test_after_perm)))
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
-                    file.write('test score for split %d is: %s'%(fold_number,','.join([str(i) for i in model_r2])))
+                    file.write('test score for split %d is: %s'%(fold_number,str(model_r2)))
                 continue
             
             elif do_feature_pruning=='rfecv':
@@ -539,7 +539,7 @@ class scikit_model:
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
-                    file.write('test score for split %d is: %s'%(fold_number,','.join([str(i) for i in model_r2])))
+                    file.write('test score for split %d is: %s'%(fold_number,str(model_r2)))
                 continue
             
             elif do_feature_pruning=='sfscv':
@@ -555,7 +555,7 @@ class scikit_model:
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
-                    file.write('test score for split %d is: %s'%(fold_number,','.join([str(i) for i in model_r2])))
+                    file.write('test score for split %d is: %s'%(fold_number,str(model_r2)))
                     
                 continue
             

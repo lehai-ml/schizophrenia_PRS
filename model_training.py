@@ -167,13 +167,13 @@ def fine_tune_hyperparameters(param_dict, model, X, y, model_name, fine_tune='gr
         
         examined_param_grid[model_examined]['search_model_best_estimator']=search.best_estimator_# save into that dictionary the best_estimator, best_parameter and best scores.
         examined_param_grid[model_examined]['search_best_params']=search.best_params_
-        examined_param_grid[model_examined]['best_score']=np.sqrt(-search.best_score_)
+        examined_param_grid[model_examined]['best_score']=search.best_score_
 
         cvres=search.cv_results_
         
         print('here is the fine tuning results \n')
-        for mean_score, params in zip(cvres['mean_test_score'],cvres['params']):
-            print(np.sqrt(-mean_score),params)
+        for mean_score, params in zip(cvres['mean score'],cvres['params']):
+            print(mean_score,params)
         
         loop_continue=input('Do you want to repeat? (yes/no): ')
         if loop_continue=='no':
@@ -225,8 +225,7 @@ def performing_rfecv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     #save the rfecv model
     
     print('my RFECV is done for fold %d'%split_no)
-    rfecv_estimator=rfecv.estimator
-    rfecv_estimator.fit(rfecv.transform(X),y)
+    rfecv_estimator=rfecv.estimator_
     scores_after_rfecv=cross_val_score(rfecv_estimator,rfecv.transform(X),y,scoring=scoring,cv=cv) #get the estimated performance scores
     
     return rfecv, rfecv_estimator, combination_idx_after_rfecv,scores_after_rfecv
@@ -271,8 +270,10 @@ def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     
     print('I am beginning the Sequential Feature Selector \n')
     
-    sfscv=SFS(model,k_features='best',forward=False,floating=True,verbose=1,scoring=scoring,cv=cv,n_jobs=-1)
+    sfscv=SFS(model,k_features='best',forward=False,floating=False,verbose=1,scoring=scoring,cv=cv,n_jobs=-1)
     sfscv.fit(X,y)
+    len_idx=len(sfscv.k_feature_idx_)# len of the best idx subset
+    scores_after_sfscv=sfscv.get_metric_dict()[len_idx]['cv_scores'] #get the estimated performance scores
     
     combination_idx_after_sfscv=sfscv.transform(combination_idx)
     
@@ -284,8 +285,6 @@ def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     
     print('my SFSCV is done for fold %d'%split_no)
     sfscv_estimator=sfscv.estimator
-    sfscv_estimator.fit(sfscv.transform(X),y)
-    scores_after_sfscv=cross_val_score(sfscv_estimator,sfscv.transform(X),y,scoring=scoring,cv=cv) #get the estimated performance scores
     
     return sfscv, sfscv_estimator, combination_idx_after_sfscv,scores_after_sfscv
 
@@ -519,7 +518,7 @@ class scikit_model:
             
                 model_r2= get_the_best_model(y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),X_test_after_perm),
-                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),rfecv.transform(X_test_after_perm)),
+                                               ('rfecv',rfecv,np.mean(scores_after_rfecv),X_test_after_perm),
                                                ('sfscv',sfscv_estimator.fit(sfscv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_sfscv),sfscv.transform(X_test_after_perm)))
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
@@ -535,7 +534,7 @@ class scikit_model:
                     
                 model_r2= get_the_best_model(y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_train_reduced_after_perm,y_train),np.mean(scores_after_perm),X_test_after_perm),
-                                               ('rfecv',rfecv_estimator.fit(rfecv.transform(X_train_reduced_after_perm),y_train),np.mean(scores_after_rfecv),rfecv.transform(X_test_after_perm)))
+                                               ('rfecv',rfecv,np.mean(scores_after_rfecv),X_test_after_perm))
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:

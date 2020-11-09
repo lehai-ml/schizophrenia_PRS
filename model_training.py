@@ -172,7 +172,7 @@ def fine_tune_hyperparameters(param_dict, model, X, y, model_name, fine_tune='gr
         cvres=search.cv_results_
         
         print('here is the fine tuning results \n')
-        for mean_score, params in zip(cvres['mean score'],cvres['params']):
+        for mean_score, params in zip(cvres['mean_test_score'],cvres['params']):
             print(mean_score,params)
         
         loop_continue=input('Do you want to repeat? (yes/no): ')

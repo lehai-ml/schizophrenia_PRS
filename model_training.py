@@ -152,7 +152,7 @@ def fine_tune_hyperparameters(param_dict, model, X, y, model_name, fine_tune='gr
             return model
             break
 
-        param_grid=dict(zip(param_dict[model_name].keys(),x)) 
+        param_grid=dict(zip(param_dict[model_name].keys(),x))
         model_examined+=1
         examined_param_grid[model_examined]={}#this will create a dynamic nested dicionary
         examined_param_grid[model_examined]['param_grid']=param_grid
@@ -356,7 +356,7 @@ class scikit_model:
         self.parameters_dict=dict({'lin_reg':None,
                          'lasso':{'alpha':[0]},
                          'ridge':{'alpha':np.linspace(200,500,10)},
-                         'random_forest':{'n_estimators':[3,10,30],'max_depth':[0],'min_samples_split':[0],'min_samples_leaf':[0],'max_leaf_nodes':[0]},
+                         'random_forest':None,
                          'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{'n_neighbors':[int(i) for i in np.linspace(1,20,20)],'weights':['uniform','distance'],'leaf_size':[0],'metric':['minkowski','euclidean','manhattan'],'p':[0]}})
 
@@ -430,7 +430,7 @@ class scikit_model:
             y_train=scaler_y.fit_transform(y_train.reshape(-1,1))
             y_test=scaler_y.transform(y_test.reshape(-1,1))
 
-            if self.model_name=='lin_svr':
+            if (self.model_name=='lin_svr') or (self.model_name=='random_forest'):
                 y_train=y_train.ravel()
                 y_test=y_test.ravel()
             
@@ -572,7 +572,7 @@ if __name__ == "__main__":
     model_dict={'lin_reg':LinearRegression(),
                 'lasso':Lasso(),
                 'ridge':Ridge(),
-                'random_forest':RandomForestRegressor(random_state=42,n_jobs=-1),
+                'random_forest':RandomForestRegressor(n_estimators=50,random_state=42,n_jobs=-1),
                 'lin_svr':LinearSVR(),
                 'knn': KNeighborsRegressor(n_jobs=-1)}
     model_name=input('model name:')

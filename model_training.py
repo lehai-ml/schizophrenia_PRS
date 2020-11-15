@@ -291,7 +291,7 @@ def performing_sfscv(model,X,y,step,combination_idx,split_no,filepath,cv,scoring
     
     return model, combination_idx_after_sfscv,scores_after_sfscv
 
-def get_the_best_model(X_test,y_test,filepath,fold_number,pipe_dict):
+def get_the_best_model(X_test,y_test,X_trainval,y_trainval,filepath,fold_number,pipe_dict):
     """
     ___________________________
     args: best_model_key,best_model,cv_score,combination_idx_array
@@ -302,6 +302,7 @@ def get_the_best_model(X_test,y_test,filepath,fold_number,pipe_dict):
     
     best_model_estimator=max(pipe_dict.items(),key=lambda x: x[1]['score'])[1]['estimator']
     best_model_key=max(pipe_dict.items(),key=lambda x: x[1]['score'])[0]
+    best_model_estimator.fit(X_trainval,y_trainval)
     
     with open(filepath+'log.txt','a+') as file:
         file.write('use the combination after %s for split_no %d \n'%(best_model_key,fold_number))
@@ -522,12 +523,12 @@ class scikit_model:
                     file.write('cross_val_score_after_rfecv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_rfecv])))
                     file.write('cross_val_score_after_sfscv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_sfscv])))
                 
-                fine_tuned_estimator.fit(X_trainval,y_trainval)
+                
                 pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_perm)},
-                           'rfecv':{'estimator':rfecv_fitted_pipe,'score':np.mean(scores_after_rfecv)},
-                           'sfscv':{'estimator':sfscv_fitted_pipe,'score':np.mean(scores_after_sfscv)}}
-            
-                model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,pipe_dict)
+                           'rfecv':{'estimator':rfecv_pipe,'score':np.mean(scores_after_rfecv)},
+                           'sfscv':{'estimator':sfscv_pipe,'score':np.mean(scores_after_sfscv)}}
+                
+                model_r2= get_the_best_model(X_test,y_test,X_trainval,y_trainval,self.filepath,fold_number,pipe_dict)
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
@@ -548,9 +549,9 @@ class scikit_model:
                     
                 fine_tuned_estimator.fit(X_trainval,y_trainval)
                 pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_perm)},
-                           'rfecv':{'estimator':rfecv_fitted_pipe,'score':np.mean(scores_after_rfecv)}}
-            
-                model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,pipe_dict)
+                           'rfecv':{'estimator':rfecv_pipe,'score':np.mean(scores_after_rfecv)}}
+                
+                model_r2= get_the_best_model(X_test,y_test,X_trainval,y_trainval,self.filepath,fold_number,pipe_dict)
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
@@ -571,9 +572,9 @@ class scikit_model:
                     
                 fine_tuned_estimator.fit(X_trainval,y_trainval)
                 pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_perm)},
-                           'sfscv':{'estimator':sfscv_fitted_pipe,'score':np.mean(scores_after_sfscv)}}
-            
-                model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,pipe_dict)
+                           'sfscv':{'estimator':sfscv_pipe,'score':np.mean(scores_after_sfscv)}}
+                
+                model_r2= get_the_best_model(X_test,y_test,X_trainval,y_trainval,self.filepath,fold_number,pipe_dict)
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:

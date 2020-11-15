@@ -506,11 +506,11 @@ class scikit_model:
             elif do_feature_pruning=='both':
                 
                 rfecv_pipe=Pipeline([('pipe0',fine_tuned_estimator.named_steps['pipe0']),
-                                     ('rfecv',RFECV(fine_tuned_estimator.named_steps[self.model_name],scoring='r2',verbose=1)),
+                                     ('rfecv',RFECV(fine_tuned_estimator.named_steps[self.model_name],scoring='r2',verbose=1,n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
                 sfscv_pipe=Pipeline([('pipe0',fine_tuned_estimator.named_steps['pipe0']),
-                                     ('sfscv',SFS(fine_tuned_estimator.named_steps[self.model_name],k_features='best',forward=False,floating=False,verbose=1,scoring='r2')),
+                                     ('sfscv',SFS(fine_tuned_estimator.named_steps[self.model_name],k_features='best',forward=False,floating=False,verbose=1,scoring='r2',n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
                 rfecv_fitted_pipe,combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(rfecv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
@@ -537,7 +537,7 @@ class scikit_model:
             
             elif do_feature_pruning=='rfecv':
                 rfecv_pipe=Pipeline([('pipe0',fine_tuned_estimator.named_steps['pipe0']),
-                                     ('rfecv',RFECV(fine_tuned_estimator.named_steps[self.model_name],scoring='r2',verbose=1)),
+                                     ('rfecv',RFECV(fine_tuned_estimator.named_steps[self.model_name],scoring='r2',verbose=1,n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
                 rfecv_fitted_pipe,combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(rfecv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
@@ -560,7 +560,7 @@ class scikit_model:
             
             elif do_feature_pruning=='sfscv':
                 sfscv_pipe=Pipeline([('pipe0',fine_tuned_estimator.named_steps['pipe0']),
-                                     ('sfscv',SFS(fine_tuned_estimator.named_steps[self.model_name],k_features='best',forward=False,floating=False,verbose=1,scoring='r2')),
+                                     ('sfscv',SFS(fine_tuned_estimator.named_steps[self.model_name],k_features='best',forward=False,floating=False,verbose=1,scoring='r2',n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
                 sfscv_fitted_pipe, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(sfscv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')

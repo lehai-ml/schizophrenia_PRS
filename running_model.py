@@ -4,7 +4,6 @@ This custom file contains functions to run scikit-learn preprocessing pipelines
 
 """
 #Scikit-lib
-from sklearn.decomposition import PCA
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_selection import VarianceThreshold,SelectorMixin
 

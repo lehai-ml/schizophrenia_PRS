@@ -14,6 +14,8 @@ from sklearn.model_selection import KFold, cross_val_score, GridSearchCV, Random
 from sklearn.metrics import mean_squared_error,r2_score
 from sklearn.inspection import permutation_importance
 
+from sklearn.base import BaseEstimator,TransformerMixin
+
 from mlxtend.feature_selection import SequentialFeatureSelector as SFS
 
 import joblib #to save models
@@ -166,10 +168,10 @@ def fine_tune_hyperparameters(param_dict, model, X, y, model_name, fine_tune='gr
         examined_param_grid[model_examined]['param_grid']=param_grid
         
         if fine_tune=='grid':
-            search=GridSearchCV(model,param_grid=param_grid,cv=cv,iid=False,scoring=scoring)
+            search=GridSearchCV(model,param_grid=param_grid,cv=cv,iid=False,scoring=scoring,verbose=1,n_jobs=-1)
             
         else:
-            search=RandomizedSearchCV(model,param_distributions=param_grid,cv=cv,n_iter=20,scoring=scoring)
+            search=RandomizedSearchCV(model,param_distributions=param_grid,cv=cv,n_iter=20,scoring=scoring,verbose=1,n_jobs=-1)
         
         search.fit(X,y)
         
@@ -307,16 +309,20 @@ def get_the_best_model(X_test,y_test,filepath,fold_number,*args):
     
     return model_r2
 
-def transform_the_indices(pipe):
+def transform_the_indices(pipe,do_feature_pruning=True):
     x=pipe.steps[0][1].steps[:]#copy of the steps
     x.pop(1)#remove the std_scaler
-    try:
-        y=pipe.steps[1]#check if there is rfecv or sfscv
-        x.insert(4,y)#insert at the end of the x
-        feature_transform_pipe=Pipeline(x)
-    except IndexError:
+    if do_feature_pruning:
+        try:
+            y=pipe.steps[1]#check if there is rfecv or sfscv
+            x.insert(4,y)#insert at the end of the x
+            feature_transform_pipe=Pipeline(x)
+        except IndexError:
+            feature_transform_pipe=Pipeline(x)
+    else:
         feature_transform_pipe=Pipeline(x)
     return feature_transform_pipe
+    
     
 
 class myPipe(Pipeline):
@@ -447,12 +453,8 @@ class scikit_model:
                            ('perm_imp',get_permutation_importances(self.model,scoring='r2'))])
             
             scaler_y=StandardScaler()
-            y_trainval=scaler_y.fit_transform(y_trainval.reshape(-1,1))
-            y_test=scaler_y.transform(y_test.reshape(-1,1))
-
-            if (self.model_name=='lin_svr') or (self.model_name=='random_forest'):
-                y_trainval=y_trainval.ravel()
-                y_test=y_test.ravel()
+            y_trainval=scaler_y.fit_transform(y_trainval.reshape(-1,1)).ravel()
+            y_test=scaler_y.transform(y_test.reshape(-1,1)).ravel()
             
             pipe_with_model=myPipe([('pipe0',pipe0),
                                       (self.model_name,self.model)])
@@ -465,7 +467,7 @@ class scikit_model:
                 param_dict={'pipe0__hcr__thresh':np.linspace(0.6,1,5),
                             'pipe0__select_percentile__percentile':np.linspace(10,90,9)}
 
-            fine_tuned_estimator=fine_tune_hyperparameters(param_dict=param_dict,pipe_with_model,X_trainval,y_trainval,model_name=self.model_name,fine_tune=self.fine_tune,cv=inner_cv,scoring='r2')
+            fine_tuned_estimator=fine_tune_hyperparameters(param_dict,pipe_with_model,X_trainval,y_trainval,model_name=self.model_name,fine_tune=self.fine_tune,cv=inner_cv,scoring='r2')
             
             scores_after_perm=cross_val_score(fine_tuned_estimator,X_trainval,y_trainval,scoring='r2',cv=inner_cv)
             
@@ -485,7 +487,7 @@ class scikit_model:
                 
                 
                 fine_tuned_estimator.fit(X_trainval,y_trainval)
-                combination_idx_after_perm=transform_the_indices(fine_tuned_estimator).transform(combination_idx)
+                combination_idx_after_perm=transform_the_indices(fine_tuned_estimator,do_feature_pruning=False).transform(combination_idx)
                 save_a_npy(combination_idx_after_perm,npy_name='combination_idx_after_perm',split_no=fold_number,filepath=self.filepath)
                 
                 y_pred=fine_tuned_estimator.predict(X_test)
@@ -523,8 +525,8 @@ class scikit_model:
             
                 model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_trainval,y_trainval),np.mean(scores_after_perm)),
-                                               ('rfecv',rfecv_fitted_pipe,np.mean(scores_after_rfecv)),
-                                               ('sfscv',sfscv_fitted_pipe,np.mean(scores_after_sfscv)))
+                                               ('rfecv',rfecv_fitted_pipe.fit(X_trainval,y_trainval),np.mean(scores_after_rfecv)),
+                                               ('sfscv',sfscv_fitted_pipe.fit(X_trainval,y_trainval),np.mean(scores_after_sfscv)))
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
@@ -545,7 +547,7 @@ class scikit_model:
                     
                 model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_trainval,y_trainval),np.mean(scores_after_perm)),
-                                               ('rfecv',rfecv_fitted_pipe,np.mean(scores_after_rfecv)))
+                                               ('rfecv',rfecv_fitted_pipe.fit(X_trainval,y_trainval),np.mean(scores_after_rfecv)))
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:
@@ -566,7 +568,7 @@ class scikit_model:
                   
                 model_r2= get_the_best_model(X_test,y_test,self.filepath,fold_number,
                                                ('perm',fine_tuned_estimator.fit(X_trainval,y_trainval),np.mean(scores_after_perm)),
-                                               ('sfscv',sfscv_fitted_pipe,np.mean(scores_after_sfscv)))
+                                               ('sfscv',sfscv_fitted_pipe.fit(X_trainval,y_trainval),np.mean(scores_after_sfscv)))
                 
                 self.test_scores_across_all_splits.append(model_r2)
                 with open(self.filepath+'score_log.txt','a+') as file:

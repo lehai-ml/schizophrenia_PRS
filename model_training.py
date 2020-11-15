@@ -386,7 +386,7 @@ class scikit_model:
                          'ridge':{'alpha':np.linspace(200,500,10)},
                          'random_forest':None,
                          'lin_svr':{'C':[0],'epsilon':[0]},
-                         'knn':{'n_neighbors':[int(i) for i in np.linspace(1,20,20)],'weights':['uniform','distance'],'leaf_size':[0],'metric':['minkowski','euclidean','manhattan'],'p':[0]}})
+                         'knn':{'n_neighbors':[int(i) for i in np.linspace(1,20,20)],'weights':['uniform','distance'],'metric':['minkowski','euclidean','manhattan']}})
 
     def feature_selection_model(self,do_feature_pruning='both'):
         """

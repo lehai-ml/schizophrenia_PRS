@@ -443,7 +443,7 @@ class scikit_model:
                          'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{'n_neighbors':[int(i) for i in np.linspace(1,20,20)],'weights':['uniform','distance'],'metric':['minkowski','euclidean','manhattan']}})
 
-    def feature_selection_model(self,do_feature_pruning='both'):
+    def feature_selection_model_simple(self,do_feature_pruning='both'):
         """
         ___________________________
         Feature selecting the model
@@ -488,7 +488,7 @@ class scikit_model:
         fold_number=0
         self.cross_validated_scores_after_rfecv=[]
         self.cross_validated_scores_after_sfscv=[]
-        self.cross_validated_scores_after_perm=[]
+        self.cross_validated_scores_after_lvr=[]
         self.test_scores_across_all_splits=[]
 
         for trainval_index,test_index in outer_cv.split(self.X,self.y):
@@ -503,10 +503,7 @@ class scikit_model:
             'Pipe_1: Setting initial parameters'
             
             pipe0=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),
-                           ('std_scaler',StandardScaler()),
-                           ('hcr',running_model.High_Corr_Remover()),
-                           ('select_percentile',SelectPercentile(f_regression,percentile=20)),
-                           ('perm_imp',get_permutation_importances(self.model,scoring='r2'))])
+                           ('std_scaler',StandardScaler())])
             
             scaler_y=StandardScaler()
             y_trainval=scaler_y.fit_transform(y_trainval.reshape(-1,1)).ravel()
@@ -516,21 +513,18 @@ class scikit_model:
                                       (self.model_name,self.model)])
             
             try:
-                param_dict={'pipe0__hcr__thresh':np.linspace(0.6,1,5),
-                            'pipe0__select_percentile__percentile':np.linspace(10,90,9),
-                            **dict(zip([self.model_name+'__'+str(i) for i in self.parameters_dict[self.model_name].keys()],self.parameters_dict[self.model_name].values()))}
+                param_dict={**dict(zip([self.model_name+'__'+str(i) for i in self.parameters_dict[self.model_name].keys()],self.parameters_dict[self.model_name].values()))}
             except AttributeError:
-                param_dict={'pipe0__hcr__thresh':np.linspace(0.6,1,5),
-                            'pipe0__select_percentile__percentile':np.linspace(10,90,9)}
+                param_dict=AttributeError
 
             fine_tuned_estimator=fine_tune_hyperparameters(param_dict,pipe_with_model,X_trainval,y_trainval,model_name=self.model_name,fine_tune=self.fine_tune,cv=inner_cv,scoring='r2')
             
-            scores_after_perm=cross_val_score(fine_tuned_estimator,X_trainval,y_trainval,scoring='r2',cv=inner_cv)
+            scores_after_lvr=cross_val_score(fine_tuned_estimator,X_trainval,y_trainval,scoring='r2',cv=inner_cv)
             
-            self.cross_validated_scores_after_perm.append(scores_after_perm)
+            self.cross_validated_scores_after_lvr.append(scores_after_lvr)
             
             with open(self.filepath+'score_log.txt','a+') as file:
-                file.write('cross_val_score_after_perm (fined_tuned) for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_perm])))
+                file.write('cross_val_score_after_lvr (fined_tuned) for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_lvr])))
             
             save_a_model(fine_tuned_estimator,model_name='fine_tuned_estimator',split_no=fold_number,filepath=self.filepath) #save the fine tuned esitmator
                         
@@ -543,8 +537,8 @@ class scikit_model:
                 
                 
                 fine_tuned_estimator.fit(X_trainval,y_trainval)
-                combination_idx_after_perm=transform_the_indices(fine_tuned_estimator,do_feature_pruning=False).transform(combination_idx)
-                save_a_npy(combination_idx_after_perm,npy_name='combination_idx_after_perm',split_no=fold_number,filepath=self.filepath)
+                combination_idx_after_lvr=transform_the_indices(fine_tuned_estimator,do_feature_pruning=False).transform(combination_idx)
+                save_a_npy(combination_idx_after_lvr,npy_name='combination_idx_after_lvr',split_no=fold_number,filepath=self.filepath)
                 
                 y_pred=fine_tuned_estimator.predict(X_test)
                 model_r2=r2_score(y_test,y_pred)
@@ -577,7 +571,7 @@ class scikit_model:
                     file.write('cross_val_score_after_sfscv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_sfscv])))
                 
                 
-                pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_perm)},
+                pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_lvr)},
                            'rfecv':{'estimator':rfecv_pipe,'score':np.mean(scores_after_rfecv)},
                            'sfscv':{'estimator':sfscv_pipe,'score':np.mean(scores_after_sfscv)}}
                 
@@ -601,7 +595,7 @@ class scikit_model:
                     file.write('cross_val_score_after_rfecv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_rfecv])))
                     
                 fine_tuned_estimator.fit(X_trainval,y_trainval)
-                pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_perm)},
+                pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_lvr)},
                            'rfecv':{'estimator':rfecv_pipe,'score':np.mean(scores_after_rfecv)}}
                 
                 model_r2= get_the_best_model(X_test,y_test,X_trainval,y_trainval,self.filepath,fold_number,pipe_dict)
@@ -624,7 +618,7 @@ class scikit_model:
                     file.write('cross_val_score_after_sfscv for split %d is:%s'%(fold_number,','.join([str(i) for i in scores_after_sfscv])))
                     
                 fine_tuned_estimator.fit(X_trainval,y_trainval)
-                pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_perm)},
+                pipe_dict={'perm':{'estimator':fine_tuned_estimator,'score':np.mean(scores_after_lvr)},
                            'sfscv':{'estimator':sfscv_pipe,'score':np.mean(scores_after_sfscv)}}
                 
                 model_r2= get_the_best_model(X_test,y_test,X_trainval,y_trainval,self.filepath,fold_number,pipe_dict)

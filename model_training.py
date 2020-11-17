@@ -377,8 +377,8 @@ class Select_Best_Correlated_features(BaseEstimator,TransformerMixin):
         percent= Percentage to choose from
         k_best= Number to choose from.
     """
-    def __init__(self,percent=0.2,k_best=None):
-        self.percent=percent
+    def __init__(self,percentile=0.2,k_best=None):
+        self.percentile=percentile
         self.k_best=k_best
         return
 
@@ -387,7 +387,7 @@ class Select_Best_Correlated_features(BaseEstimator,TransformerMixin):
         if type(self.k_best)==int:
             self.total_features_select=self.k_best
         else:
-            self.total_features_select=int(np.ceil(self.percent*X.shape[1]))
+            self.total_features_select=int(np.ceil(self.percentile*X.shape[1]))
         self.features_selected=np.sort((np.argsort(self.correlation_to_the_target)[::-1][:self.total_features_select]))
         return self
 
@@ -502,12 +502,19 @@ class scikit_model:
             combination_idx=self.combination_idx.reshape(1,-1)
             'Pipe_1: Setting initial parameters'
             
-            pipe0=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),
+            if do_Select_Percentile==False:
+                pipe0=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),
                            ('std_scaler',StandardScaler()),
                            ('hcr',running_model.High_Corr_Remover()),
-                           ('select_percentile',SelectPercentile(f_regression,percentile=20)),
+                           ('select_percentile',Select_Best_Correlated_features(percentile=20)),
                            ('perm_imp',get_permutation_importances(self.model,scoring='r2'))])
-            
+            else:
+                pipe0=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),
+                            ('std_scaler',StandardScaler()),
+                            ('hcr',running_model.High_Corr_Remover()),
+                            ('select_percentile',SelectPercentile(f_regression,percentile=20)),
+                            ('perm_imp',get_permutation_importances(self.model,scoring='r2'))])
+                
             scaler_y=StandardScaler()
             y_trainval=scaler_y.fit_transform(y_trainval.reshape(-1,1)).ravel()
             y_test=scaler_y.transform(y_test.reshape(-1,1)).ravel()

@@ -443,7 +443,7 @@ class scikit_model:
                          'lin_svr':{'C':[0],'epsilon':[0]},
                          'knn':{'n_neighbors':[int(i) for i in np.linspace(1,20,20)],'weights':['uniform','distance'],'metric':['minkowski','euclidean','manhattan']}})
 
-    def feature_selection_model(self,do_feature_pruning='both'):
+    def feature_selection_model(self,do_feature_pruning='both',do_Select_Percentile=False):
         """
         ___________________________
         Feature selecting the model
@@ -503,6 +503,7 @@ class scikit_model:
             'Pipe_1: Setting initial parameters'
             
             if do_Select_Percentile==False:
+                print('not doing Select percentile f-score')
                 pipe0=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),
                            ('std_scaler',StandardScaler()),
                            ('hcr',running_model.High_Corr_Remover()),

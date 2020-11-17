@@ -400,7 +400,7 @@ class scikit_model:
     Handles the fine-tuning and feature selection.
     """
 
-    def __init__(self,model,X,y,combination_idx,fine_tune='grid',filepath='./',model_name=None,step=1,random_state=42):
+    def __init__(self,model,X,y,combination_idx,fine_tune='grid',filepath='./',model_name=None,random_state=42):
         
         """
         ___________________________
@@ -566,9 +566,9 @@ class scikit_model:
                                      ('sfscv',SFS(fine_tuned_estimator.named_steps[self.model_name],k_features='best',forward=False,floating=False,verbose=1,scoring='r2',n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
-                rfecv_fitted_pipe,combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(rfecv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
+                rfecv_fitted_pipe,combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(rfecv_pipe,X_trainval,y_trainval,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
                 
-                sfscv_fitted_pipe, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(sfscv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
+                sfscv_fitted_pipe, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(sfscv_pipe,X_trainval,y_trainval,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
                 
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
@@ -593,7 +593,7 @@ class scikit_model:
                                      ('rfecv',RFECV(fine_tuned_estimator.named_steps[self.model_name],scoring='r2',verbose=1,n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
-                rfecv_fitted_pipe,combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(rfecv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
+                rfecv_fitted_pipe,combination_idx_after_rfecv,scores_after_rfecv = performing_rfecv(rfecv_pipe,X_trainval,y_trainval,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
                 
                 self.cross_validated_scores_after_rfecv.append(scores_after_rfecv)
                 
@@ -616,7 +616,7 @@ class scikit_model:
                                      ('sfscv',SFS(fine_tuned_estimator.named_steps[self.model_name],k_features='best',forward=False,floating=False,verbose=1,scoring='r2',n_jobs=-1)),
                                      (self.model_name,fine_tuned_estimator.named_steps[self.model_name])])
                 
-                sfscv_fitted_pipe, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(sfscv_pipe,X_trainval,y_trainval,step=self.step,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
+                sfscv_fitted_pipe, combination_idx_after_sfscv,scores_after_sfscv = performing_sfscv(sfscv_pipe,X_trainval,y_trainval,combination_idx=combination_idx,split_no=fold_number,filepath=self.filepath,cv=inner_cv,scoring='r2')
                 
                 self.cross_validated_scores_after_sfscv.append(scores_after_sfscv)
                 
@@ -658,7 +658,7 @@ if __name__ == "__main__":
     filepath=input('filepath:')
     # filepath='./'
     fine_tune=input('fine tune (grid/randomized):')
-    x=scikit_model(model,X,y,combination_idx=combination_idx,fine_tune=fine_tune,filepath=filepath,model_name=model_name,step=1,random_state=42)
+    x=scikit_model(model,X,y,combination_idx=combination_idx,fine_tune=fine_tune,filepath=filepath,model_name=model_name,random_state=42)
     do_feature_pruning=input('Do feature prunning?(none,both,rfecv,sfscv):')
     x.feature_selection_model(do_feature_pruning=do_feature_pruning)
     

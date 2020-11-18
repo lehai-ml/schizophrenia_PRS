@@ -395,6 +395,18 @@ class Select_Best_Correlated_features(BaseEstimator,TransformerMixin):
         X_new=X[:,self.features_selected]
         return X_new
 
+class choose_by_p_value_of_fregression(BaseEstimator,TransformerMixin):
+    def __init__(self,alpha=0.05):
+        self.alpha=alpha
+
+    def fit(self,X,y):
+        self.F_score,self.p_value=f_regression(X,y)
+        return self
+    def transform(self,X,y=None):
+        X_new=X[:,np.where(self.p_value<=self.alpha)[0]]
+        return X_new
+
+
 class scikit_model:
     """
     Handles the fine-tuning and feature selection.
@@ -510,7 +522,8 @@ class scikit_model:
             y_test=scaler_y.transform(y_test.reshape(-1,1)).ravel()
             
             pipe_with_model=myPipe([('pipe0',pipe0),
-                                      (self.model_name,self.model)])
+                                    ('f_reg',choose_by_p_value_of_fregression(alpha=0.05)),
+                                    (self.model_name,self.model)])
             
             try:
                 param_dict={**dict(zip([self.model_name+'__'+str(i) for i in self.parameters_dict[self.model_name].keys()],self.parameters_dict[self.model_name].values()))}

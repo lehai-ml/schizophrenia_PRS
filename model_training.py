@@ -388,7 +388,7 @@ class Select_Best_Correlated_features(BaseEstimator,TransformerMixin):
         if type(self.k_best)==int:
             self.total_features_select=self.k_best
         else:
-            self.total_features_select=int(np.ceil(self.percentile*X.shape[1]))
+            self.total_features_select=int(np.ceil((self.percentile*X.shape[1])/100))
         self.features_selected=np.sort((np.argsort(self.correlation_to_the_target)[::-1][:self.total_features_select]))
         return self
 

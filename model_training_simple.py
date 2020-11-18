@@ -515,14 +515,14 @@ class scikit_model:
             'Pipe_1: Setting initial parameters'
             
             pipe0=Pipeline([('lvr',running_model.Low_Variance_Remover(variance_percent=0)),
-                           ('std_scaler',StandardScaler())])
+                           ('std_scaler',StandardScaler()),
+                           ('f_reg',choose_by_p_value_of_fregression(alpha=0.05))])
             
             scaler_y=StandardScaler()
             y_trainval=scaler_y.fit_transform(y_trainval.reshape(-1,1)).ravel()
             y_test=scaler_y.transform(y_test.reshape(-1,1)).ravel()
             
             pipe_with_model=myPipe([('pipe0',pipe0),
-                                    ('f_reg',choose_by_p_value_of_fregression(alpha=0.05)),
                                     (self.model_name,self.model)])
             
             try:

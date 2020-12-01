@@ -18,11 +18,12 @@ lin_reg/
 knn/
 random_forest/
 .ipynb_checkpoints/
-
-
+.R*
+test.*
 # C extensions
 *.so
-
+model1/
+alternat*/
 # Distribution / packaging
 .Python
 build/

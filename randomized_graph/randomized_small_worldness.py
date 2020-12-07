@@ -13,7 +13,7 @@ C_sparsity_normalized_random_low_risk=[]
 L_sparsity_normalized_random_low_risk=[]
 
 for sparsity in range(30):
-    print(time.time-starttime)
+    print(time.time()-starttime)
     C_temp=[]
     L_temp=[]
     for perm in range(1000):
@@ -49,7 +49,7 @@ C_sparsity_normalized_random_high_risk=[]
 L_sparsity_normalized_random_high_risk=[]
 
 for sparsity in range(30):
-    print(time.time-starttime)
+    print(time.time()-starttime)
     C_temp=[]
     L_temp=[]
     for perm in range(1000):

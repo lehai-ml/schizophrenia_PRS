@@ -34,10 +34,9 @@ def binarize_matrix_based_on_sparsity_threshold(corrmatrix,percentage,bins=10):
     binarized_corrmatrix=np.where(corrmatrix[:,:]>threshold,float(1),float(0))
     return binarized_corrmatrix
 
-def create_random_graph(original_graph,r):
+def create_random_graph(original_graph,r=100):
     """
-    Generate randomized graph:In the original matrix, if i1 was connected to j1 and i2 was connected to j2, for random matrices, we swapped the edges between i1 and i2.(Shi et al., 2012)
-
+    Generate randomized graph:In the original matrix, if i1 was connected to j1 and i2 was connected to j2, for random matrices, we swapped the edges between i1 and i2.(Shi et al., 2012) if both of the new edges do not already exist, otherwise we keep the original edges in the random graph.
     """
     for repetition in range(r):
         updated_graph=original_graph.copy()
@@ -47,8 +46,11 @@ def create_random_graph(original_graph,r):
             try:
                 i,j=random_combination(updated_graph.edges,2)
                 rewired_pair=((i[0],j[1]),(j[0],i[1]))
+                if rewired_pair[0] in updated_graph.edges or rewired_pair[1] in updated_graph.edges:
+                    random_graph.add_edges_from((i,j))
+                else:
+                    random_graph.add_edges_from(rewired_pair)
                 updated_graph.remove_edges_from((i,j))
-                random_graph.add_edges_from(rewired_pair)
             except ValueError:
                 if len(updated_graph.edges)==1:
                     random_graph.add_edges_from(updated_graph.edges)

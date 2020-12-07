@@ -21,7 +21,7 @@ from mlxtend.feature_selection import SequentialFeatureSelector as SFS
 import joblib #to save models
 
 import inspect
-import running_model
+import preprocessing_step.running_model as running_model
 
 import numpy as np
 import sys

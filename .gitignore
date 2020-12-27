@@ -20,6 +20,10 @@ random_forest/
 .ipynb_checkpoints/
 .R*
 test.*
+.vscode/
+
+
+
 # C extensions
 *.so
 model1/

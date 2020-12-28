@@ -188,7 +188,7 @@ def generate_random_matrix(matrix):
     np.fill_diagonal(original_matrix,0)
     return original_matrix
 
-logging_graph_analysis_output=partial(logging_output_as_array,argument='logging.txt')
+logging_graph_analysis_output=partial(logging_output_as_array,argument='./log/graph_metrics.txt')
 @logging_graph_analysis_output
 def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):    
     """

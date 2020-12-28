@@ -2,9 +2,9 @@
 This contains the function to perform network statistics
 """
 from random import choice,choices
-
+from functools import partial
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import networkx as nx
 from networkx import from_numpy_array
 from networkx.algorithms.efficiency_measures import global_efficiency, local_efficiency
@@ -12,6 +12,7 @@ from networkx.algorithms.cluster import clustering
 from networkx.algorithms.shortest_paths.generic import average_shortest_path_length
 
 from . import data_preprocessing
+from .logging_outputs import logging_output_as_array
 
 # def check_the_network_measurements(original_func,file_path):
 #     """
@@ -187,8 +188,9 @@ def generate_random_matrix(matrix):
     np.fill_diagonal(original_matrix,0)
     return original_matrix
 
-def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):
-    
+logging_graph_analysis_output=partial(logging_output_as_array,argument='logging.txt')
+@logging_graph_analysis_output
+def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):    
     """
     Calculates the following metrics: local and global efficiency, and
         normalized clustering, path length and small worldness.

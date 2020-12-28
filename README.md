@@ -1,6 +1,6 @@
-# Identifying neuroimaging markers associated with schizophrenia polygenic risk scores in ePRIME cohort
+# Identifying neuroimaging markers associated with schizophrenia polygenic risk scores
 
-The project aims to identify the connectivity markers associated with polygenic risk scores in ePRIME cohort.
+The project aims to identify the connectivity markers associated with polygenic risk scores.
 
 #### Table of content
 1. [Objective](#objective)
@@ -14,7 +14,6 @@ The project aims to identify the connectivity markers associated with polygenic 
 6. [Logs](#logs)
 
 # Objective
-
 # Methods
 ## Preprocessing
 

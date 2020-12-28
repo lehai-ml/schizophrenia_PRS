@@ -20,7 +20,7 @@ import operator
 from itertools import combinations
 
 #Custom functions
-from . import data_preprocessing
+from .. import data_preprocessing
 
 def lowest_percent_variance(percent,variance_object):
     
@@ -30,7 +30,7 @@ def lowest_percent_variance(percent,variance_object):
     ___________________________________________________________
     Args:
         percent (float): The percentage of variances you want to remove.
-        variance_object(VarianceThreshold()): The fitted to data 
+        variance_object(VarianceThreshold()): The fitted to data
             VarianceThreshold()
     
     Returns:
@@ -99,9 +99,9 @@ def remove_correlated_features(X, y, combination_index, thresh=0.8, met='elimina
         combination_index (np.array): set of new feature 
             indices (in the same order as the original set)
     """
-    correlated_matrix=preprocessing.lower_triangle(abs(np.corrcoef(X,rowvar=False)),side_of_the_square=X.shape[1]) #extract the lower triangle of the absolute correlation matrix. this will have a shape (n_features^2)/2
+    correlated_matrix=data_preprocessing.lower_triangle(abs(np.corrcoef(X,rowvar=False))) #extract the lower triangle of the absolute correlation matrix. this will have a shape (n_features^2)/2
     
-    correlated_to_target=np.asarray([preprocessing.lower_triangle(abs(np.corrcoef(X[:,i],y,rowvar=False)),2)[0] for i in range(X.shape[1])]) #this will calculates the absolute correlation between each feature with the target. this will have shape (n_features,)
+    correlated_to_target=np.asarray([data_preprocessing.lower_triangle(abs(np.corrcoef(X[:,i],y,rowvar=False)))[0] for i in range(X.shape[1])]) #this will calculates the absolute correlation between each feature with the target. this will have shape (n_features,)
     
     combination_index_in_string=[str(i) for i in combination_index[::-1]]#the same combination_index in string format. Running with itertools.combinations will improve the timing.
     

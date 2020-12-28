@@ -21,6 +21,8 @@ random_forest/
 .R*
 test.*
 .vscode/
+dataset/
+log/
 
 
 

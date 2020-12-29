@@ -12,7 +12,6 @@ from networkx.algorithms.cluster import clustering
 from networkx.algorithms.shortest_paths.generic import average_shortest_path_length
 
 from . import data_preprocessing
-from .logging_outputs import logging_output_as_array
 
 # def check_the_network_measurements(original_func,file_path):
 #     """
@@ -188,8 +187,6 @@ def generate_random_matrix(matrix):
     np.fill_diagonal(original_matrix,0)
     return original_matrix
 
-logging_graph_analysis_output=partial(logging_output_as_array,argument='./log/graph_metrics.txt')
-@logging_graph_analysis_output
 def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):    
     """
     Calculates the following metrics: local and global efficiency, and

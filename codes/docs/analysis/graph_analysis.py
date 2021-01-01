@@ -187,7 +187,7 @@ def generate_random_matrix(matrix):
     np.fill_diagonal(original_matrix,0)
     return original_matrix
 
-def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):    
+def calculate_network_metrics_random_volumetric_data(matrix,n_random=100,**kwargs):    
     """
     Calculates the following metrics: local and global efficiency, and
         normalized clustering, path length and small worldness.
@@ -198,7 +198,7 @@ def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):
         local_efficiency
         global_efficiency
         normalized clustering = real clustering / randomized clustering
-        normalized path length= real path length / randomized path length 
+        normalized path length= real path length / randomized path length
         small worldness = normalized clustering / normalized path length
     Notes
         F. Shi et al. (2012) Neuroimage 62 1622- 1633.
@@ -209,6 +209,12 @@ def calculate_network_metrics_random_volumetric_data(matrix,n_random=100):
     #efficiency
     global_eff=global_efficiency(G)
     local_eff=local_efficiency(G)
+    try:
+        if not kwargs['small_worldness']:
+            return local_eff, global_eff
+    except KeyError:
+        pass
+        
     #clustering and path length
     def clustering_coefficient_and_path_length(G):
         clustering_values=clustering(G)

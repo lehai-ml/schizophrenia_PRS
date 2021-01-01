@@ -2,7 +2,6 @@
 This custom file contains functions to run scikit-learn preprocessing pipelines 
     and training ML models.
 """
-import inspect
 import pandas as pd
 import numpy as np
 
@@ -235,11 +234,8 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
             self.met
         """
         
-        args, _, _, values=inspect.getargvalues(inspect.currentframe())
-        values.pop('self')
-        
-        for arg,val in values.items():
-            setattr(self, arg,val)
+        self.thresh=thresh
+        self.met=met
     
     def fit (self,X,y):
         """

@@ -2,9 +2,6 @@
 This custom file contains functions to run scikit-learn preprocessing pipelines 
     and training ML models.
 """
-import pandas as pd
-import numpy as np
-
 #Scikit-lib
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_selection import VarianceThreshold,SelectorMixin
@@ -17,6 +14,8 @@ from networkx.algorithms.community import greedy_modularity_communities
 
 import operator
 from itertools import combinations
+import pandas as pd
+import numpy as np
 
 #Custom functions
 from .. import data_preprocessing

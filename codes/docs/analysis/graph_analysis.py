@@ -242,13 +242,14 @@ def calculate_network_metrics_random_volumetric_data(matrix,n_random=100,**kwarg
 
     return local_eff, global_eff, normalized_clustering, normalized_path_length, small_worldness
 
-def preprocess_perm_graph_results(**kwargs):
+def preprocess_perm_graph_results(shape,**kwargs):
     """
     Results have been run simultaneously on several virtual machines, and
         sometimes the connection is broken. The results are written to a .txt
         file, and each permuted example has 30 lines corresponding to 30
         thresholds of network sparsity.
     Args:
+        shape: (-1,30,5)
         high_risk (list of file paths)
         low_risk (list of file paths)
     Return:
@@ -264,25 +265,28 @@ def preprocess_perm_graph_results(**kwargs):
     perm_high=[]
     perm_low=[]
     for idx,i in enumerate(kwargs['high_risk']):
-        #the files have vm and run number.
-        if str.split(i,'vm')[1] not in kwargs['low_risk'][idx]:
-            print('the following files do not correspond:',i,'and',kwargs['low_risk'][idx])
-        else:
-            temp_result_high=new_processed_matrix(kwargs['high_risk'][idx])
-            temp_result_low=new_processed_matrix(kwargs['low_risk'][idx])
-            if len(temp_result_low)!=len(temp_result_high):
-                print('the two list do not have the same length:',i,'and',kwargs['low_risk'][idx])
-                new_n_sample=len(min([temp_result_low,temp_result_high], key=len))
-                temp_result_high=temp_result_high[0:new_n_sample,:]
-                temp_result_low=temp_result_low[0:new_n_sample,:]
+        try:
+            #the files have vm and run number.
+            if str.split(i,'vm')[1] not in kwargs['low_risk'][idx]:
+                print('the following files do not correspond:',i,'and',kwargs['low_risk'][idx])
+        except IndexError:
+            pass
+    
+        temp_result_high=new_processed_matrix(kwargs['high_risk'][idx])
+        temp_result_low=new_processed_matrix(kwargs['low_risk'][idx])
+        if len(temp_result_low)!=len(temp_result_high):
+            print('the two list do not have the same length:',i,'and',kwargs['low_risk'][idx])
+            new_n_sample=len(min([temp_result_low,temp_result_high], key=len))
+            temp_result_high=temp_result_high[0:new_n_sample,:]
+            temp_result_low=temp_result_low[0:new_n_sample,:]
 
         perm_high.append(temp_result_high)
         perm_low.append(temp_result_low)
-    perm_high=np.vstack(perm_high).reshape((-1,30,5))
-    perm_low=np.vstack(perm_low).reshape((-1,30,5))
+    perm_high=np.vstack(perm_high).reshape(shape)
+    perm_low=np.vstack(perm_low).reshape(shape)
     return perm_high,perm_low
 
-def calculate_perm_p_value(obsv_high,obsv_low,perm_high,perm_low,):
+def calculate_perm_p_value(obsv_high,obsv_low,perm_high,perm_low,metrics):
     """
     Calculate the between group difference. and see if less than 5 percentile 
         of between-group difference in the permutation distribution was greater 
@@ -294,12 +298,12 @@ def calculate_perm_p_value(obsv_high,obsv_low,perm_high,perm_low,):
         low graph metrics matrices.
     
     Returns:
-        p_value_matrix (30 x 5)
+        p_value_matrix (30 x metrics)
     """
     between_group_difference=abs(perm_high-perm_low)
     obsv_difference=abs(obsv_high-obsv_low)
-    p_value_matrix=np.zeros((30,5))
+    p_value_matrix=np.zeros((30,metrics))
     for network_sparsity_threshold in range(30): #30 thresholds
-        for metric in range(5):# 5 metrics
+        for metric in range(metrics):# 5 metrics
             p_value_matrix[network_sparsity_threshold,metric]=len(np.where(between_group_difference[:,network_sparsity_threshold,metric]>=obsv_difference[network_sparsity_threshold,metric])[0])/between_group_difference.shape[0]
     return p_value_matrix

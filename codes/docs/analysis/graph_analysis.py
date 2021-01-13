@@ -2,7 +2,7 @@
 This contains the function to perform network statistics
 """
 from random import choice,choices
-from functools import partial
+# from functools import partial
 import numpy as np
 # import pandas as pd
 import networkx as nx
@@ -286,7 +286,7 @@ def preprocess_perm_graph_results(shape,**kwargs):
     perm_low=np.vstack(perm_low).reshape(shape)
     return perm_high,perm_low
 
-def calculate_perm_p_value(obsv_high,obsv_low,perm_high,perm_low,metrics):
+def calculate_perm_p_value(obsv_high,obsv_low,perm_high,perm_low,metrics=5):
     """
     Calculate the between group difference. and see if less than 5 percentile 
         of between-group difference in the permutation distribution was greater 

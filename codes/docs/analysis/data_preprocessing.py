@@ -66,7 +66,7 @@ def ROIs_combinations(csv_filename):
     combinations=np.vstack(combinations)
     return combinations
 
-def read_table_from_txt(file):
+def read_table_from_txt(file,add_EP=False):
     
     """
     For reading PRS and ancestral PC tables with FID and IID columns in txt
@@ -80,7 +80,8 @@ def read_table_from_txt(file):
     """
     
     table=pd.read_table(file,delim_whitespace=True)
-    table['IID']=['EP'+str(i) for i in table['IID']]
+    if add_EP:
+        table['IID']=['EP'+str(i) for i in table['IID']]
     table=table.drop('FID',axis=1)
     table=table.rename({'IID':'ID'},axis=1)
     table=table.sort_values('ID').reset_index(drop=True)

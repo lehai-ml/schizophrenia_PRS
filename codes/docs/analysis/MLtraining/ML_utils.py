@@ -1,5 +1,5 @@
 """ML_utils.py
-This custom file contains functions to run scikit-learn preprocessing pipelines 
+This custom file contains functions to run scikit-learn preprocessing pipelines
     and training ML models.
 """
 #Scikit-lib

@@ -74,7 +74,7 @@ def binarize_matrix_based_on_sparsity_threshold(corrmatrix,percentage,bins=10):
     binarized_corrmatrix=np.where(corrmatrix[:,:]>threshold,float(1),float(0))
     return binarized_corrmatrix
 
-def yield_perm_matrices_volumetric_data(X,perm_run,network_sparisity):
+def yield_perm_matrices_volumetric_data(X,perm_run,network_sparisity,diffusion_data=False):
     """
     Perform non-parametric permutation testing (Shi et al., 2012)
         First, a network property measure (e.g., efficiency, clustering,
@@ -86,10 +86,11 @@ def yield_perm_matrices_volumetric_data(X,perm_run,network_sparisity):
         percentile of between group difference in the permutation distribution
         was greater than the observed group difference.
     Args:
-        X (np.array): the subject volumetric data
+        X (np.array): the group volumetric or diffusion data
         network_sparsity (list): list of network sparsity thresholds
-    Return
-        set of random low risk matrices, and high risk matrices in a
+        diffusion_data (Boolean): if X is diffusion data.
+            If True (default False), instead of corr matrix, the mean connectivity value for 
+            set of random low risk matrices, and high risk matrices in a
             shape of n x m where n is network sparsity thresholds and m is
             regions.
 
@@ -97,19 +98,26 @@ def yield_perm_matrices_volumetric_data(X,perm_run,network_sparisity):
     for _ in range(perm_run):
         new_y=np.asarray(choices([0,1],k=X.shape[0]))
         
-        corrmatrix_perm_low_risk=abs(np.corrcoef(X[new_y==0,:],rowvar=False))
-        np.fill_diagonal(corrmatrix_perm_low_risk,0)
+        if diffusion_data:
+            X_mean_connectivity_low_risk=np.mean(X[new_y==0],axis=0)# here the X_mean has a data shape of nx p, where p is number of unique features.
+            X_mean_connectivity_high_risk=np.mean(X[new_y==1],axis=0)
+            matrix_perm_low_risk=data_preprocessing.reverse_lower_triangle(X_mean_connectivity_low_risk)
+            matrix_perm_high_risk=data_preprocessing.reverse_lower_triangle(X_mean_connectivity_high_risk)
         
-        corrmatrix_perm_high_risk=abs(np.corrcoef(X[new_y==1,:],rowvar=False))
-        np.fill_diagonal(corrmatrix_perm_high_risk,0)
-    
-        binarized_perm_low_risk_matrices=np.asarray([ 
+        else:
+            matrix_perm_low_risk=abs(np.corrcoef(X[new_y==0,:],rowvar=False))
+            np.fill_diagonal(matrix_perm_low_risk,0)
+            
+            matrix_perm_high_risk=abs(np.corrcoef(X[new_y==1,:],rowvar=False))
+            np.fill_diagonal(matrix_perm_high_risk,0)
+        
+        binarized_perm_low_risk_matrices=np.asarray([
             data_preprocessing.lower_triangle(
-            binarize_matrix_based_on_sparsity_threshold(corrmatrix_perm_low_risk,threshold/100,bins=100)) for threshold in network_sparisity])
+            binarize_matrix_based_on_sparsity_threshold(matrix_perm_low_risk,threshold/100,bins=100)) for threshold in network_sparisity])
         
         binarized_perm_high_risk_matrices=np.asarray([
             data_preprocessing.lower_triangle(
-            binarize_matrix_based_on_sparsity_threshold(corrmatrix_perm_high_risk,threshold/100,bins=100)) for threshold in network_sparisity])
+            binarize_matrix_based_on_sparsity_threshold(matrix_perm_high_risk,threshold/100,bins=100)) for threshold in network_sparisity])
         
         yield binarized_perm_low_risk_matrices,binarized_perm_high_risk_matrices
 

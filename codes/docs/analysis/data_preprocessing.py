@@ -87,6 +87,31 @@ def read_table_from_txt(file,add_EP=False):
     table=table.sort_values('ID').reset_index(drop=True)
     return table
 
+def move_multiple_columns(df,cols_to_move=[],ref_col='',place='After'):
+    """
+    Move multiple columns of the pandas dataframe to a new position.
+    Args:
+        df (Pandas dataframe)
+        cols_to_move (list): list of the name of the columns
+        ref_col (str): name of the reference column
+        place ('After' or 'Before'): place the new columns either after or before the reference column.
+    Returns:
+        a new data frame.
+    
+    E.g.
+        move_multiple_columns(european_diffusion_dataset,cols_to_move=['Session_y','Gender','GA','PMA'],ref_col='ID',place='After')
+    """
+    cols=df.columns.to_list()
+    if place=='After':
+        seg1=cols[:cols.index(ref_col)+1]
+        seg2=cols_to_move
+    if place=='Before':
+        seg1=cols[:cols.index(ref_col)]
+        seg2=cols_to_move+[ref_col]
+    seg1=[i for i in seg1 if i not in seg2]
+    seg3=[i for i in cols if i not in seg1+seg2]
+    return(df[seg1+seg2+seg3])
+
 def lower_triangle(matrix):
     """
     Organizes a square unidirectional matrix into 1D vector. Because the matrix 

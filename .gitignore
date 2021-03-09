@@ -18,13 +18,15 @@ lin_reg/
 knn/
 random_forest/
 .ipynb_checkpoints/
-.R*
 test.*
 .vscode/
 dataset/
 log/
 
-
+#R extensions
+.RData
+.Rhistory
+*.Rproj
 
 # C extensions
 *.so
@@ -151,3 +153,4 @@ dmypy.json
 pipeline.pptx
 ePrime_nosibs_european_pruned_excludeLD_pca10.eigenvec.txt py38-env.txt scz2_sixlevels_ld1000G.highres.all.score.txt
 py38-env.txt
+.Rproj.user

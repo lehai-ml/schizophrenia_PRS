@@ -1,0 +1,443 @@
+---
+title: "dHCP diffusion Data exploration"
+output: html_notebook
+---
+# Importing the data:
+
+The full dataset is divided into the preterm and term dataset. The preterm cohort is further selected to choose those with term at scan.
+```{r}
+european_diffusion_dataset.term<-read.csv('./preprocessed_data/diffusion/european_ID_diffusion_dataset_term_without_outliers.csv')
+```
+
+# Collapsing the diffusion regional space
+## Retaining non-zero connections
+
+```{r}
+to_remove_list=c()
+for (i in 6:4010){
+  if (length(which(european_diffusion_dataset.term[,i]==0))/151>0){
+    to_remove_list<-c(to_remove_list,i)
+  }
+}
+```
+
+This retained 2513 connections.
+
+```{r}
+european_diffusion_dataset.term.removed_zeros<-subset(european_diffusion_dataset.term,select=-to_remove_list)
+write.csv(european_diffusion_dataset.term.removed_zeros,'./reduced_european_diffusion_dataset.csv',row.names=FALSE)
+```
+
+```{r}
+formula_lm<-function(y,covariates=c('GA.at.birth','PMA.at.birth','Gender','Anc_PC1','Anc_PC2','Anc_PC3'),prs,with_interaction=FALSE){
+  " this function creates a linear model in R with a custom function.
+  Arguments:
+    y (str): the independent variables- here is the diffusion value.
+    covariates (str): the covariates used in the linear model aside from the prs.
+    prs (str): the PRS values.
+    with_interaction (bool): if True, the prs * covariate is added as additional covariate term.
+  Return:
+    linear model formula used in the lm R function.
+  Example:
+    > formula_lm(colnames(european_diffusion_dataset.term)[7],prs=PRS_scores[1],with_interaction = FALSE)
+    PreCG.R_PreCG.L ~ GA.at.birth + PMA.at.birth + Gender + X1e.08
+  "
+  if (length(covariates)==0){
+    as.formula(paste(y,prs,sep = '~'))
+  }
+  else{
+    if (with_interaction){
+      as.formula(paste(y,paste(c(covariates,prs,paste(prs,covariates,sep='*')),collapse='+'),sep='~')) 
+    }
+    else{
+      as.formula(paste(y,paste(c(covariates,prs),collapse='+'),sep='~')) 
+    }
+  }
+}
+
+PRS_scores=c('X1e.08','X1e.07','X1e.06','X1e.05','X0.0001','X0.001','X0.01','X0.05','X0.1','X0.5','X1')
+# example:
+print(formula_lm(colnames(european_diffusion_dataset.term)[6],prs=PRS_scores[1],with_interaction = FALSE))
+```
+
+## Visualising the babies' risk scores across PRS thresholds.
+
+```{r}
+# library(ggplot2)
+PRS_scores=c('1e-08','1e-07','1e-06','1e-05','1e-04','1e-03','1e-02','0.05','0.1','0.5','1')
+PRS_df=data.frame(V1=c())
+for (i in 2716:2726){
+  PRS_df<-rbind(PRS_df,data.frame(V1=c(european_diffusion_dataset.term.removed_zeros[,i])))
+}
+
+par(mfrow=c(1,2))
+PRS_df$PRS_thresholds=rep(1:11,each=151)
+bpt<-boxplot(V1~PRS_thresholds,data=PRS_df,axes=FALSE)
+axis(2,at=seq(-0.01,0.03,by=0.01),labels=seq(-0.01,0.03,by=0.01))
+axis(1,at=1:11,labels=PRS_scores,las=3)
+lines(1:11,bpt$stats[3,])
+title(ylab = 'risk scores values', xlab='PRS Thresholds')
+
+bpt<-boxplot(V1~PRS_thresholds,data=PRS_df[PRS_df$PRS_thresholds>5,],axes=FALSE)
+axis(2,at=seq(-0.0025,0.005,by=0.001),labels=seq(-0.0025,0.005,by=0.001))
+axis(1,at=1:6,labels=PRS_scores[6:11],las=3)
+lines(1:6,bpt$stats[3,])
+title(ylab = 'risk scores values', xlab='PRS Thresholds')
+```
+As we take more stringent criteria for SNPs, we see there is larger range of PRS values. As the PRS thresholds become less stringent, the shape becomes normal distribution. 
+
+# Performing univariate test to each connection with PRS, GA, PMA and Gender and Anc_PCs as covariates.
+```{r}
+df.allPRS_nointeraction<-data.frame(Connection=character(),
+                        prs_pval=double(),
+                        prs_coef=double(),
+                        GA_pval=double(),
+                        GA_coef=double(),
+                        PMA_pval=double(),
+                        PMA_coef=double(),
+                        Gender_pval=double(),
+                        Gender_coef=double(),
+                        Adj_R_square=double(),
+                        model_pval=double(),
+                        PRS_threshold=character(),stringsAsFactors = FALSE)
+
+for (prs in PRS_scores){
+  for (i in 6:2518){
+    connection=colnames(european_diffusion_dataset.term.removed_zeros)[i]
+    simple.regression<-lm(formula_lm(connection,prs=prs,with_interaction = FALSE),data=european_diffusion_dataset.term.removed_zeros)
+    simple.regression.summary<-summary(simple.regression)
+    temp_row<-data.frame(Connection=connection,
+      prs_pval=simple.regression.summary$coefficients[prs,4],
+      prs_coef=simple.regression.summary$coefficients[prs,1],
+      GA_pval=simple.regression.summary$coefficients['GA.at.birth',4],
+      GA_coef=simple.regression.summary$coefficients['GA.at.birth',1],
+      PMA_pval=simple.regression.summary$coefficients['PMA.at.birth',4],
+      PMA_coef=simple.regression.summary$coefficients['PMA.at.birth',1],
+      Gender_pval=simple.regression.summary$coefficients['Gender',4],
+      Gender_coef=simple.regression.summary$coefficients['Gender',1],
+      Anc_PC1_pval=simple.regression.summary$coefficients['Anc_PC1',4],
+      Anc_PC1_coef=simple.regression.summary$coefficients['Anc_PC1',1],
+      Anc_PC2_pval=simple.regression.summary$coefficients['Anc_PC2',4],
+      Anc_PC2_coef=simple.regression.summary$coefficients['Anc_PC2',1],
+      Anc_PC3_pval=simple.regression.summary$coefficients['Anc_PC3',4],
+      Anc_PC3_coef=simple.regression.summary$coefficients['Anc_PC3',1],
+      Adj_R_square=simple.regression.summary$adj.r.squared,
+      model_pval=as.double(pf(simple.regression.summary$fstatistic[1],simple.regression.summary$fstatistic[2],simple.regression.summary$fstatistic[3],lower.tail=FALSE)),
+      PRS_threshold=prs
+      )
+    df.allPRS_nointeraction<-rbind(df.allPRS_nointeraction,temp_row)
+  }
+}
+```
+
+```{r}
+#write.csv(df.allPRS_nointeraction,'./observed_univariate_test.csv',row.names=FALSE)
+df.allPRS_nointeraction=read.csv('./observed_univariate_test.csv')
+head(df.allPRS_nointeraction)
+```
+
+Here the best prs_pval is 0.0001254505, for IFGtriang.R_ORBmid.R at PRS threshold of 0.5.
+
+# Permutation testing:
+
+1. Randomize PRS risk scores between subjects, but preserve the GA, PMA and Gender. The same order of permutation is applied to all 11 thresholds.
+2. Re-compute the df.allPRS_nointeraction table, and record the smallest PRS p-value. This will build the null distribution for PRS p-value. (We can record the same for other Gender.)
+3. Procedure repeated for 1000 times
+4. Significance is reached if less than 5% of the null distribution is greater than the observed p-value.
+
+```{r}
+original_subset=data.frame(subset(european_diffusion_dataset.term.removed_zeros,select = c(4:2514,2712:2722)))# this retains only the diffusion data and PRS scores.
+write.csv(original_subset,'./preprocessed_data/diffusion/term/original_subset_for_data_exploration_R.csv',row.names = FALSE)
+original_subset=read.csv('./preprocessed_data/diffusion/term/original_subset_for_data_exploration_R.csv')
+```
+
+```{r}
+calculate_p_val<-function(df,filename,perm_run=0,PRS_scores=c('X1e.08','X1e.07','X1e.06','X1e.05','X0.0001','X0.001','X0.01','X0.05','X0.1','X0.5','X1'),with_interaction=FALSE){
+  "
+  perform series of multiple linear regression with the response variable as diffusion value and predictors as prs score, pma, ga and gender
+  "
+  for (prs in PRS_scores){
+    for (i in 4:2511){
+      connection=colnames(df)[i]
+      simple.regression<-lm(formula_lm(connection,prs=prs,with_interaction = FALSE),data=df)
+      simple.regression.summary<-summary(simple.regression)
+      temp_row<-data.frame(Connection=connection,
+                           prs_pval=simple.regression.summary$coefficients[prs,4],
+                           GA_pval=simple.regression.summary$coefficients['GA.at.birth',4],
+                           PMA_pval=simple.regression.summary$coefficients['PMA.at.birth',4],
+                           Gender_pval=simple.regression.summary$coefficients['Gender',4],
+                           Adj_R_square=simple.regression.summary$adj.r.squared,
+                           PRS_threshold=prs,
+                           perm_run=perm_run
+      )
+      write.table(temp_row,file=filename,sep=',',col.names = !file.exists(filename),row.names=FALSE,append=T)
+    }
+  }
+}
+```
+
+Repeated the procedure for 1000 times, shows that it did not survive the multiple correction
+
+```{r}
+
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+
+for (i in 1:permutation_n){
+  p=sample(1:nrow(original_subset))
+  perm_subset=cbind(original_subset[,1:2511],original_subset[p,2512:2522])
+  # this line first applies R function sample to each of the 11 PRS columns of the original dataframe.
+  # Once these columns are resampled, they are re-appended (cbind) to the rest of the orignal dataframe which contains diffusion values and PMA, GA and gender
+  filename=paste('./log/perm_table_result_run_','.csv',sep=as.character(i))
+  calculate_p_val(perm_subset,filename = filename,perm_run=i)
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+```
+
+# Results
+
+## Histogram of PRS p-val in a single permutation run
+```{r}
+permuted_table=read.csv('./log/diffusion/term/perm_data_in_R/perm_table_result_run_1.csv')
+hist(permuted_table$prs_pval,main='Histogram of PRS p-value for all connections in 1 permutation run',cex.main=0.6,xlab='PRS p-value',breaks=50)
+sort(permuted_table$prs_pval)[(as.integer(0.05*27588))]
+```
+
+## Histogram of PRS p-val for a single connection in across all permutation
+```{r}
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+permuted_table_connection=data.frame()
+connection='IFGtriang.R_ORBmid.R'
+i=1
+for (csv_file in dir('./log/diffusion/term/perm_data_in_R/')){
+  temp_table<-read.csv(paste0('./log/diffusion/term/perm_data_in_R/',csv_file))
+  permuted_table_connection<-rbind(permuted_table_connection,temp_table[temp_table$Connection==connection,])
+  setTxtProgressBar(pb, i)
+  i<-i+1
+}
+close(pb)
+```
+
+```{r}
+hist(permuted_table_connection$prs_pval,main='Histogram of PRS p-value for IFGtriang.R_ORBmid.R across 1000 permutations',cex.main=0.6,xlab='PRS p-value',breaks=50)
+hist(permuted_table_connection[permuted_table_connection$PRS_threshold=='X1e.08',]$prs_pval,main='Histogram of PRS p-value for IFGtriang.R_ORBmid.R across 1000 permutations in 1 PRS Threshold',cex.main=0.6,xlab='PRS p-value')
+sort(permuted_table_connection$prs_pval)[550]
+```
+
+## Distribution of smallest p-value across 1000 run across all thresholds
+```{r}
+#Distribution of smallest p-value across 1000 run across all thresholds
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+permuted_table_smallest_p_val=data.frame()
+i=1
+for (csv_file in dir('./log/diffusion/term/perm_data_in_R/')){
+  temp_table<-read.csv(paste0('./log/diffusion/term/perm_data_in_R/',csv_file))
+  permuted_table_smallest_p_val<-rbind(permuted_table_smallest_p_val,temp_table[temp_table$prs_pval==min(temp_table$prs_pval),])
+  setTxtProgressBar(pb, i)
+  i<-i+1
+}
+close(pb)
+```
+
+## Distribution of smallest p-value across 1000 run across separate thresholds:
+```{r}
+#Distribution of smallest p-value across 1000 run across separate thresholds
+
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+permuted_table_smallest_p_val_per_threshold=data.frame()
+i=1
+for (csv_file in dir('./log/diffusion/term/perm_data_in_R/')){
+  temp_table<-read.csv(paste0('./log/diffusion/term/perm_data_in_R/',csv_file))
+  for (threshold in PRS_scores){
+    temp_smallest_idx=which.min(temp_table[temp_table$PRS_threshold==threshold,]$prs_pval)
+    temp_row=temp_table[temp_table$PRS_threshold==threshold,][temp_smallest_idx,]
+    permuted_table_smallest_p_val_per_threshold<-rbind(permuted_table_smallest_p_val_per_threshold,temp_row)
+    }
+  setTxtProgressBar(pb, i)
+  i<-i+1
+}
+close(pb)
+```
+
+
+```{r}
+hist((permuted_table_smallest_p_val$prs_pval),main='Histogram of smallest PRS p-value across 1000 permutations across all thresholds',cex.main=0.6,xlab='PRS p-value',breaks=100)
+temp_table<-data.frame()
+for (threshold in PRS_scores){
+  hist(permuted_table_smallest_p_val_per_threshold[permuted_table_smallest_p_val_per_threshold$PRS_threshold==threshold,]$prs_pval,main=paste(c('Histogram of smallest PRS p-value across 1000 permutations across threshold',threshold),sep=' '),breaks=100,cex.main=0.6,xlab='PRS p-value')
+  temp_row<-data.frame(connection=df.allPRS_nointeraction[df.allPRS_nointeraction$prs_pval==min(df.allPRS_nointeraction[df.allPRS_nointeraction$PRS_threshold==threshold,]$prs_pval),1],
+                       observed_pvalue=min(df.allPRS_nointeraction[df.allPRS_nointeraction$PRS_threshold==threshold,]$prs_pval),
+                       perm_pvalue=sort(permuted_table_smallest_p_val_per_threshold[permuted_table_smallest_p_val_per_threshold$PRS_threshold==threshold,]$prs_pval)[50],
+                       threshold=threshold)
+  temp_table<-rbind(temp_table,temp_row)
+}
+temp_table<-rbind(data.frame(connection=df.allPRS_nointeraction[which.min(df.allPRS_nointeraction$prs_pval),'Connection'],
+                  observed_pvalue=df.allPRS_nointeraction[which.min(df.allPRS_nointeraction$prs_pval),'prs_pval'],
+                  perm_pvalue=sort(permuted_table_smallest_p_val$prs_pval)[50],
+                  threshold='All thresholds'
+),temp_table)
+print(temp_table)
+```
+# Reducing the Diffusion connectivity space with PCA
+
+```{r}
+colnames(european_diffusion_dataset.term.removed_zeros)[6:]
+```
+
+
+```{r}
+diffusion.pca<-prcomp(european_diffusion_dataset.term.removed_zeros[6:2518])
+summary(diffusion.pca)
+plot(1:151,as.vector(summary(diffusion.pca)$importance[3,]),main='Cumulative Proprotion of Explained Variance',ylab='Explained Variance',xlab='PC')
+print(which(as.vector(summary(diffusion.pca)$importance[3,])>0.95)[1])
+abline(v=88,h=0.95)
+```
+
+```{r}
+View(summary(diffusion.pca)$rotation[,'PC1'])
+```
+
+
+```{r}
+original_subset.pca=cbind(european_diffusion_dataset.term.removed_zeros[,4:6],diffusion.pca$x[,1:89],european_diffusion_dataset.term.removed_zeros[,2712:2722])# this retains only the diffusion PCA data and PRS scores.
+write.csv(original_subset.pca,'./preprocessed_data/diffusion/term/original_subset_for_data_exploration_R_pca.csv',row.names=FALSE)
+```
+
+```{r}
+df.allPRS_nointeraction.PCA<-data.frame(Connection=character(),
+                        prs_pval=double(),
+                        prs_coef=double(),
+                        GA_pval=double(),
+                        GA_coef=double(),
+                        PMA_pval=double(),
+                        PMA_coef=double(),
+                        Gender_pval=double(),
+                        Gender_coef=double(),
+                        Adj_R_square=double(),
+                        model_pval=double(),
+                        PRS_threshold=character(),stringsAsFactors = FALSE)
+
+for (prs in PRS_scores){
+  for (i in 4:92){
+    connection=colnames(original_subset.pca)[i]
+    simple.regression<-lm(formula_lm(connection,prs=prs,with_interaction = FALSE),data=original_subset.pca)
+    simple.regression.summary<-summary(simple.regression)
+    temp_row<-data.frame(Connection=connection,
+      prs_pval=simple.regression.summary$coefficients[prs,4],
+      prs_coef=simple.regression.summary$coefficients[prs,1],
+      GA_pval=simple.regression.summary$coefficients['GA.at.birth',4],
+      GA_coef=simple.regression.summary$coefficients['GA.at.birth',1],
+      PMA_pval=simple.regression.summary$coefficients['PMA.at.birth',4],
+      PMA_coef=simple.regression.summary$coefficients['PMA.at.birth',1],
+      Gender_pval=simple.regression.summary$coefficients['Gender',4],
+      Gender_coef=simple.regression.summary$coefficients['Gender',1],
+      Adj_R_square=simple.regression.summary$adj.r.squared,
+      model_pval=as.double(pf(simple.regression.summary$fstatistic[1],simple.regression.summary$fstatistic[2],simple.regression.summary$fstatistic[3],lower.tail=FALSE)),
+      PRS_threshold=prs
+      )
+    df.allPRS_nointeraction.PCA<-rbind(df.allPRS_nointeraction.PCA,temp_row)
+  }
+}
+```
+
+# Results
+
+## Histogram of PRS p-val in a single permutation run
+```{r}
+permuted_table_pca=read.csv('./log/diffusion/term/perm_data_pca_in_R/perm_table_pca_result_run_1.csv')
+hist(permuted_table_pca$prs_pval,main='Histogram of PRS p-value for all connections in 1 permutation run',cex.main=0.6,xlab='PRS p-value',breaks=50)
+sort(permuted_table_pca$prs_pval)[(as.integer(0.05*979))]
+```
+
+## Histogram of PRS p-val for a single connection in across all permutation
+```{r}
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+permuted_table_connection=data.frame()
+connection='PC66'
+i=1
+for (csv_file in dir('./log/diffusion/term/perm_data_in_R/')){
+  temp_table<-read.csv(paste0('./log/diffusion/term/perm_data_in_R/',csv_file))
+  permuted_table_connection<-rbind(permuted_table_connection,temp_table[temp_table$Connection==connection,])
+  setTxtProgressBar(pb, i)
+  i<-i+1
+}
+close(pb)
+```
+
+```{r}
+hist(permuted_table_connection$prs_pval,main='Histogram of PRS p-value for IFGtriang.R_ORBmid.R across 1000 permutations',cex.main=0.6,xlab='PRS p-value',breaks=50)
+hist(permuted_table_connection[permuted_table_connection$PRS_threshold=='X1e.08',]$prs_pval,main='Histogram of PRS p-value for IFGtriang.R_ORBmid.R across 1000 permutations in 1 PRS Threshold',cex.main=0.6,xlab='PRS p-value')
+sort(permuted_table_connection$prs_pval)[550]
+```
+
+## Distribution of smallest p-value across 1000 run across all thresholds
+```{r}
+#Distribution of smallest p-value across 1000 run across all thresholds
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+permuted_table_smallest_p_val_pca=data.frame()
+i=1
+for (csv_file in dir('./log/diffusion/term/perm_data_pca_in_R/')){
+  temp_table<-read.csv(paste0('./log/diffusion/term/perm_data_pca_in_R/',csv_file))
+  permuted_table_smallest_p_val_pca<-rbind(permuted_table_smallest_p_val_pca,temp_table[temp_table$prs_pval==min(temp_table$prs_pval),])
+  setTxtProgressBar(pb, i)
+  i<-i+1
+}
+close(pb)
+```
+
+## Distribution of smallest p-value across 1000 run across separate thresholds:
+```{r}
+#Distribution of smallest p-value across 1000 run across separate thresholds
+
+permutation_n=1000# set the permutation run
+pb <- txtProgressBar(min = 0, max = permutation_n, style = 3)
+permuted_table_smallest_p_val_per_threshold_pca=data.frame()
+i=1
+for (csv_file in dir('./log/diffusion/term/perm_data_pca_in_R/')){
+  temp_table<-read.csv(paste0('./log/diffusion/term/perm_data_pca_in_R/',csv_file))
+  for (threshold in PRS_scores){
+    temp_smallest_idx=which.min(temp_table[temp_table$PRS_threshold==threshold,]$prs_pval)
+    temp_row=temp_table[temp_table$PRS_threshold==threshold,][temp_smallest_idx,]
+    permuted_table_smallest_p_val_per_threshold_pca<-rbind(permuted_table_smallest_p_val_per_threshold_pca,temp_row)
+    }
+  setTxtProgressBar(pb, i)
+  i<-i+1
+}
+close(pb)
+```
+
+
+```{r}
+hist((permuted_table_smallest_p_val_pca$prs_pval),main='Histogram of smallest PRS p-value across 1000 permutations across all thresholds',cex.main=0.6,xlab='PRS p-value',breaks=100)
+temp_table<-data.frame()
+for (threshold in PRS_scores){
+  hist(permuted_table_smallest_p_val_per_threshold_pca[permuted_table_smallest_p_val_per_threshold_pca$PRS_threshold==threshold,]$prs_pval,main=paste(c('Histogram of smallest PRS p-value across 1000 permutations across threshold',threshold),sep=' '),breaks=100,cex.main=0.6,xlab='PRS p-value')
+  temp_row<-data.frame(connection=df.allPRS_nointeraction.PCA[df.allPRS_nointeraction.PCA$prs_pval==min(df.allPRS_nointeraction.PCA[df.allPRS_nointeraction.PCA$PRS_threshold==threshold,]$prs_pval),1],
+                       observed_pvalue=min(df.allPRS_nointeraction.PCA[df.allPRS_nointeraction.PCA$PRS_threshold==threshold,]$prs_pval),
+                       perm_pvalue=sort(permuted_table_smallest_p_val_per_threshold_pca[permuted_table_smallest_p_val_per_threshold_pca$PRS_threshold==threshold,]$prs_pval)[50],
+                       threshold=threshold)
+  temp_table<-rbind(temp_table,temp_row)
+}
+temp_table<-rbind(data.frame(connection=df.allPRS_nointeraction.PCA[which.min(df.allPRS_nointeraction.PCA$prs_pval),'Connection'],
+                  observed_pvalue=df.allPRS_nointeraction.PCA[which.min(df.allPRS_nointeraction.PCA$prs_pval),'prs_pval'],
+                  perm_pvalue=sort(permuted_table_smallest_p_val_pca$prs_pval)[50],
+                  threshold='All thresholds'
+),temp_table)
+print(temp_table)
+```
+
+PCA loadings are the coefficients of the linear combination of the original variables from which the PCs are constructed.
+
+```{r}
+```
+
+```{r}
+View(aload[,'PC1'])
+```
+

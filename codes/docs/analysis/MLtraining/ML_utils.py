@@ -5,6 +5,8 @@ This custom file contains functions to run scikit-learn preprocessing pipelines
 #Scikit-lib
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_selection import VarianceThreshold,SelectorMixin
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression
 
 #Network visualisation and algorithm
 import networkx as nx
@@ -269,3 +271,40 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
         
         new_X=X[:,self.corr_idx]
         return new_X
+
+def splitting_dataset_into_k_fold(X,y,k=5):
+    """
+    For nested_CV, divide the dataset into inner and outer folds
+    Args:
+        X= dataset
+        y= label
+        k= folds number
+    return
+        generator of format
+            (X_train,y_train,X_test, y_test)
+    """
+    outer_cv=KFold(n_splits=k)
+    for trainval_index,test_index in outer_cv.split(X,y):
+        X_trainval=X[trainval_index,:]
+        y_trainval=y[trainval_index]
+        X_test=X[test_index,:]
+        y_test=y[test_index]
+        yield (X_trainval,y_trainval,X_test,y_test)
+        
+def get_bias_correction_test1(y_true,y_pred):
+    lin_reg=LinearRegression()
+    lin_reg.fit(y_true,y_pred)#y_pred=y_test*coef + intercept
+    coef=lin_reg.coef_
+    intercept=lin_reg.intercept_
+    
+    return (coef, intercept)
+
+def get_bias_correction_test2(y_true,y_pred):
+    lin_reg=LinearRegression()
+    lin_reg.fit(y_true,y_pred)#y_pred=y_test*coef + intercept
+    coef=lin_reg.coef_
+    intercept=lin_reg.intercept_
+    
+    return (coef, intercept)
+    
+    

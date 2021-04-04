@@ -200,27 +200,26 @@ def common_features_across_all_splits(n,*args):
     unique_idx,unique_counts=np.unique(np.concatenate(args,axis=1),return_counts=True)
     return unique_idx[np.where(unique_counts>n)]
 
-def high_low_risk_divide(y,bins=10,percentage=0.2):
+def high_low_risk_divide(y,high_perc=0.1,low_perc=0.3):
     
     """
     Divide the dataset into top and bottom x%. Here, we take the assumption that top percent is high risk and bottom percent is low risk.
+    While this method maximises the odd ratio for impacts, it raises concerns about the arbitrariness of the quantile used.
     Args:
         y: the raw PRS score.
-        bins: number of bins to divide.
-        percentage (float)
+        high_perc (float): higher risk group percentage
+        low_perc (float): lower risk group percentage
     Return:
         low_risk,high_risk (np.arrays): indices
     """
     
-    counts,number_of_bin=np.histogram(y,bins=bins)
-    number_to_retain=percentage*len(y)
+    high_risk_number=int(np.ceil(high_perc*len(y)))
+    low_risk_number=int(np.ceil(low_perc*len(y)))
+    if high_risk_number+low_risk_number>len(y):
+        raise Exception('The high and low risk selection overlapped')
     #bottom
-    pos_low=np.where(np.cumsum(counts)>=number_to_retain)[0][0]
-    low_risk=np.where(y<=number_of_bin[pos_low+1])[0]
+    low_risk=np.argsort(y)[:low_risk_number]
     #top
-    pos_high=np.where(np.cumsum(counts[::-1])>=number_to_retain)[0][0]
-    high_risk=np.where(y>=number_of_bin[::-1][pos_high+1])[0]
+    high_risk=np.argsort(y)[::-1][:high_risk_number]
     
-    return low_risk,high_risk
-        
-        
+    return high_risk,low_risk

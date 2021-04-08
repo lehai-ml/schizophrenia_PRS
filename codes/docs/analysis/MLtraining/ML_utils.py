@@ -8,10 +8,11 @@ from sklearn.feature_selection import VarianceThreshold,SelectorMixin
 from sklearn.model_selection import KFold
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.feature_selection import f_regression
 
 #Network visualisation and algorithm
-import networkx as nx
-from networkx.algorithms.community import greedy_modularity_communities
+# import networkx as nx
+# from networkx.algorithms.community import greedy_modularity_communities
 
 #Python essentials
 
@@ -21,6 +22,9 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 from scipy.stats import pearsonr
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components #use depth-first search
+import statsmodels.api as sm
 #Custom functions
 from .. import data_preprocessing
 
@@ -168,7 +172,7 @@ def lowest_percent_variance(percent,variance_object):
         
 #         return combination_index
 
-def remove_correlated_features(X,target,threshold=0.8):
+def remove_correlated_features(X,target,threshold=0.85): #calculate corr coef reiterively.
     """
     Remove correlated features.
     Args:
@@ -189,37 +193,81 @@ def remove_correlated_features(X,target,threshold=0.8):
         here the feature 1 can represent the features 2,3 and 4.
     
     """
-    X=X.copy() # avoid changes to the original array
+    original_X=X.copy()# avoid changes to the input array
+    new_X=X.copy()
     dict_of_features=defaultdict(list)
     for i in range(X.shape[1]):
         dict_of_features[i].append(i)
     
     while True:
-        corr_matrix_between_features=np.corrcoef(X,rowvar=False) # calculate the correlation matrix between features
+        corr_matrix_between_features=np.corrcoef(new_X,rowvar=False) # calculate the correlation matrix between features
         corr_matrix_between_features[np.isnan(corr_matrix_between_features)]=0 # set any nan number to 0.
-        np.fill_diagonal(corr_matrix_between_features,0) # fill the diagonal of 1s to 0s.
+        corr_matrix_between_features=np.tril(corr_matrix_between_features,k=-1)
         maximum_correlation=np.max(np.abs(corr_matrix_between_features))
         if maximum_correlation < threshold:
             break
-        # for some reason, when the nrow (X) is < ncol(X), then the resulting correlation matrix is symmetrical, but not when nrow(X) is less than ncol(X), the difference in the non-symmetrical is very small, almost non-negligible. However, when you run np.where, this will result in differing output.
-        try:
-            feature_0,feature_1=np.where(np.abs(corr_matrix_between_features)==maximum_correlation)[0] # find where the highest correlation pair is
-        except ValueError: # when the unpacking is unsuccessful, feature is an array int
-            feature_0,feature_1=np.where(np.abs(corr_matrix_between_features)==maximum_correlation)
-            feature_0=feature_0[0] #get it into an interger format to be consistent
-            feature_1=feature_1[0]
-        feature_0_corr_coef=pearsonr(X[:,feature_0],target)[0]
-        feature_1_corr_coef=pearsonr(X[:,feature_1],target)[0]
+        feature_0,feature_1=np.where(np.abs(corr_matrix_between_features)==maximum_correlation)
+        feature_0=feature_0[0] #return the first value.
+        feature_1=feature_1[0]
+        
+        feature_0_corr_coef=pearsonr(new_X[:,feature_0],target)[0]
+        feature_1_corr_coef=pearsonr(new_X[:,feature_1],target)[0]
         if feature_0_corr_coef>feature_1_corr_coef: # check which one has higher correlation to the target
             dict_of_features[feature_0].extend(dict_of_features[feature_1]) # represent the lower correlated feature with the higher one.
-            X[:,feature_1]=np.nan # set the values in the eliminated feature as nan. so that next time, we don't have to recompute the correlation.
+            new_X[:,feature_0]=np.mean(original_X[:,dict_of_features[feature_0]],axis=1)#use the original matrix to calculate.
+            new_X[:,feature_1]=np.nan # set the values in the eliminated feature as nan. so that next time, we don't have to recompute the correlation.
             del dict_of_features[feature_1] # delete that key
         else:
             dict_of_features[feature_1].extend(dict_of_features[feature_0])
-            X[:,feature_0]=np.nan
+            new_X[:,feature_1]=np.mean(original_X[:,dict_of_features[feature_1]],axis=1)
+            new_X[:,feature_0]=np.nan
             del dict_of_features[feature_0]
 
     return dict_of_features
+
+# def remove_correlated_features(X,target,threshold=0.8):# using connected components
+#     """
+#     Remove correlated features. Find the connected components and I average the values.
+#     Args:
+#         X np.array: the feature matrix.
+#         target np.array: 1D shape the target that the features are selected 
+#         upon.
+#         threshold (0-1): correlation coefficient threshold the correlated pairs 
+#         are selected.
+    
+#     Returns:
+#         dict_of_features (defaultdict(list)): dictionary where the keys are the
+#         index of the features, and the values, are the index of features that 
+#         the key feature represent.
+    
+#     Example:
+#         > remove_correlated_features(X,target,threshold=0.8)
+#         >> {[0]: [0],[1]: [1,2,3,4],...}
+#         here the feature 1 can represent the features 2,3 and 4.
+    
+#     """
+#     X=X.copy() # avoid changes to the original array
+#     dict_of_features=defaultdict(list)
+    
+#     corr_matrix_with_target=np.asarray([pearsonr(X[:,i],target)[0] for i in range(X.shape[1])])#first calculate the corr coef between the target and the feature
+#     corr_matrix_between_features=np.corrcoef(X,rowvar=False) # calculate the correlation matrix between features
+#     corr_matrix_between_features=np.tril(corr_matrix_between_features,-1)# set everything above the diagonal, and the diagonal to 0.
+#     binarized_corr_matrix=np.where(corr_matrix_between_features<threshold,0,1)#set anything below the threshold to 0 and otherwise to 1.
+#     binarized_corr_matrix_Graph=csr_matrix(binarized_corr_matrix)
+#     n_components,labels=connected_components(binarized_corr_matrix_Graph,directed=False) # find the connected components and the labels for each of that component.
+#     for label in range(n_components): # labels will be an array of labels 
+#         # ordered by the indices of the vertices, i.e. [0,0,1,2,3]- the first 
+#         # and second nodes are connected in the one connected graph, whereas 
+#         # the third, fourth and fifth nodes do not have anywhere to be 
+#         # connected, in the binarized matrix, they are zero values.
+#         features=np.where(labels==label)[0]#this will give the indices of the vertices in the same connected component.
+#         if len(features)>1:
+#             representative_feature=features[np.argmax(abs(corr_matrix_with_target[features]))]#check which feature has the best correlation to the target and use that as the represented name.
+#             dict_of_features[representative_feature]=list(features)
+#         else:
+#             dict_of_features[features[0]]=list(features)
+            
+#     return dict_of_features
 
 def merge_features_values(X,dict_of_features,average=False):
     """
@@ -251,7 +299,7 @@ def merge_features_values(X,dict_of_features,average=False):
     for col in range(X.shape[1]):
         if not dict_of_features[col]:#if this key is empty
             X[:,col]=np.nan
-    return X  
+    return X
 
 def merge_features_names(dict_of_features,feature_names):
     """
@@ -276,7 +324,7 @@ def merge_features_names(dict_of_features,feature_names):
     new_dict_of_names=defaultdict(list)
     for key,values in dict_of_features.items():
         if len(values)>1:
-            new_dict_of_names[feature_names[key]]=list(feature_names[values[1:]])
+            new_dict_of_names[feature_names[key]]=list(feature_names[values])
     return new_dict_of_names
 
 
@@ -342,7 +390,7 @@ class Retain_non_zero_features(BaseEstimator,TransformerMixin):
     Attributes:
         @self.perc_threshold= the percentage of zero allowed (0-1)
         @self.zero_perc= calculated percentages of zero across features columns
-        @self.reduced_feature_names= array of the retained feature names.
+        @self.reduced_features_names= array of the retained feature names.
     """
     def __init__(self,perc_threshold=0):
         self.perc_threshold=perc_threshold
@@ -359,7 +407,7 @@ class Retain_non_zero_features(BaseEstimator,TransformerMixin):
         return new_X
     
     def get_column_names(self,feature_names):
-        self.reduced_feature_names=feature_names[~(self.zero_perc>self.perc_threshold)]
+        self.reduced_features_names=feature_names[~(self.zero_perc>self.perc_threshold)]
         
         return self
         
@@ -439,15 +487,86 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
         """
         feature_names: the list of features as strings. (e.g. pd.Dataframe.columns)
         Returns:
-            feature_dict_strings (defaultdict): the key are the features, that 
+            merged_feature_dict_strings (defaultdict): the key are the features, that 
             represent other features. This dictionary does not include the 
             names of features, that do not represent other features.
+            reduced_features_names=the names of columns of the outputed matrix
         """
         
-        self.feature_dict_strings=merge_features_names(self.features_dict,feature_names)
+        self.merged_feature_dict_strings=merge_features_names(self.features_dict,feature_names)
+        mask=np.ones(len(feature_names),dtype=bool)#set a mask of 1s.
+        for col in range(len(mask)):
+            if not self.features_dict[col]:#if the key is empty
+                mask[col]=False #set to false
+                
+        self.reduced_features_names=feature_names[mask]
         return self
 
+class Select_Features_Univariate(BaseEstimator,TransformerMixin):
+    """
+    Fit univariate linear regression test to each feature column, and check its 
+    association with the target. Select the features with pval<0.05
+    Attributes:
+        @self.F= calculated F-scores
+        @self.p_val= calculated p-values of F-scores
+        @self.reduced_features_names=the new reduced feature column names.
+    Note:
+        This f_regression func gives the same result as sm.OLS.
+    """
+    def __init__(self,target,p_value_threshold=0.05):
+        self.p_value_threshold=p_value_threshold
+        self.target=target
+        
+    def fit(self,X,y=None):
+        self.F,self.p_val=f_regression(X,self.target)
+        return self
     
+    def transform(self,X,y=None):
+        new_X=X.copy()
+        new_X=new_X[:,self.p_val<=self.p_value_threshold]
+        return new_X
+    
+    def get_column_names(self,feature_names):
+        self.reduced_features_names=feature_names[self.p_val<=self.p_value_threshold]
+        
+class Select_Features_Multivariate(BaseEstimator,TransformerMixin):
+    def __init__(self,target,covariates,p_value_threshold=0.05):
+        self.target=target
+        self.p_value_threshold=p_value_threshold
+        self.covariates=covariates
+
+    def fit(self,X,y=None):
+        self.p_value=[]
+        independent_Var=np.concatenate((self.covariates,self.target.reshape(-1,1)),axis=1)
+        independent_Var=sm.add_constant(independent_Var)
+        for col in range(X.shape[1]):
+            model=sm.OLS(X[:,col],independent_Var).fit()
+            self.p_value.append(model.pvalues[-1])
+        self.p_value=np.asarray(self.p_value)
+        
+        return self
+    
+    def transform(self,X,y=None):
+        new_X=X.copy()
+        new_X=new_X[:,self.p_value<=self.p_value_threshold]
+        return new_X
+    
+    def get_column_names(self,feature_names):
+        self.reduced_features_names=feature_names[self.p_value<=self.p_value_threshold]
+    
+    def return_largest_component_size(self):
+        p_val_matrix=data_preprocessing.reverse_lower_triangle(self.p_value)
+        p_val_matrix[np.triu_indices_from(p_val_matrix,k=0)]=1 # set everything in the upper triangle to 1
+        p_val_matrix=np.nan_to_num(p_val_matrix,nan=1)
+        p_val_matrix=np.where(p_val_matrix<self.p_value_threshold,1,0)# set 1s to 0, i.e. inactive
+        p_val_matrix_Graph=csr_matrix(p_val_matrix)
+        self.n_components,self.labels=connected_components(p_val_matrix_Graph)
+        component_sizes=np.unique(self.labels,return_counts=True)[1]
+        self.largest_component_size=np.max(component_sizes)
+        return self.largest_component_size
+        
+
+
 def print_scores(y_pred,y_true):
     return {'r2': r2_score(y_true,y_pred),
     'MAE': mean_absolute_error(y_true,y_pred),
@@ -462,12 +581,13 @@ def splitting_dataset_into_k_fold(X,y,k=5):
         X= dataset
         y= label
         k= folds number
+        corr_target (bool): if true, provide 
     return
         generator of format
             (X_train,y_train,X_test, y_test)
     """
     outer_cv=KFold(n_splits=k)
-    for trainval_index,test_index in outer_cv.split(X,y):
+    for trainval_index,test_index in outer_cv.split(X):
         X_trainval=X[trainval_index,:]
         y_trainval=y[trainval_index]
         X_test=X[test_index,:]

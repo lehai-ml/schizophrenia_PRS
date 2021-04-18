@@ -6,7 +6,7 @@ output: html_notebook
 
 The full dataset is divided into the preterm and term dataset. The preterm cohort is further selected to choose those with term at scan.
 ```{r}
-european_diffusion_dataset.term<-read.csv('./preprocessed_data/diffusion/european_ID_diffusion_dataset_term_without_outliers.csv')
+european_diffusion_dataset.term<-read.csv('./preprocessed_data/diffusion/european_ID_diffusion_dataset_term.csv')
 ```
 
 # Collapsing the diffusion regional space
@@ -449,4 +449,17 @@ write.table(PRS_thresholds_cor,'./preprocessed_data/diffusion/term/PRS_threshold
 ```
 
 The effective number of independent tests performed for 11 PRS thresholds is 3. Therefore the multiple-comparison corrected P-value threshold is p value of 0.05/3 = 0.0169. We did not reach it.
+
+
+
+```{r}
+X_low_risk_reduced<-read.csv('X_low_risk_reduced.csv')
+```
+
+```{r}
+spca_test=spca(X_low_risk_reduced,K=6,para=c(0.06,0.16,0.1,0.5,0.5,0.5))
+```
+```{r}
+spca_test$loadings
+```
 

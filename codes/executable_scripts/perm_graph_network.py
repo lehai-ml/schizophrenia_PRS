@@ -1,51 +1,52 @@
-import tqdm
 import sys
+import tqdm
 import numpy as np
-from codes.docs.analysis import data_preprocessing, graph_analysis
+import pandas as pd
+import bct
+from collections import defaultdict
+from codes.docs.analysis import graph_analysis, data_preprocessing
 
-X1=np.load(sys.argv[1])
-X2=np.load(sys.argv[2])
+class analyse_graph:
+    def __init__(self,low_risk_corr_matrix,high_risk_corr_matrix):
+        self.low_risk_corr_matrix=low_risk_corr_matrix
+        self.high_risk_corr_matrix=high_risk_corr_matrix
 
-random_graph_generator_preterm=graph_analysis.yield_perm_matrices_volumetric_data(X1,1000,np.linspace(1,30,30),diffusion_data=True)
+    def network_metrics(self,sparsity_range=range(5,7)):
 
-random_graph_generator_term=graph_analysis.yield_perm_matrices_volumetric_data(X2,1000,np.linspace(1,30,30),diffusion_data=True)
+        for sparsity in tqdm.tqdm(sparsity_range):
+            
+            temp_corr_matrix_high_risk = graph_analysis.binarize_matrix_based_on_sparsity_threshold(self.high_risk_corr_matrix,sparsity/100)
 
-# for _ in tqdm.tqdm(range(1000)):
-#     try:
-#         binarized_perm_low_risk,binarized_perm_high_risk=next(random_graph_generator_preterm)
-        
-#         for threshold in tqdm.tqdm(range(30)):
-#             temp_path_low_risk='./log/diffusion/preterm/PRS10/perm_graph_metrics_low_risk_diffusion_preterm_PRS10_vm1_run1.txt'
-#             perm_low_risk_metrics=graph_analysis.calculate_network_metrics_random_volumetric_data(data_preprocessing.reverse_lower_triangle(binarized_perm_low_risk[threshold],51),n_random=10,small_worldness=True)
+            temp_corr_matrix_low_risk = graph_analysis.binarize_matrix_based_on_sparsity_threshold(self.low_risk_corr_matrix,sparsity/100)
+            
+            #high risk
+            original_network_metrics_high, random_network_metrics_high = graph_analysis.calculate_network_metrics_bin_und(temp_corr_matrix_high_risk)
 
-#             with open(temp_path_low_risk,'ab') as f:
-#                 np.savetxt(f,np.asarray([perm_low_risk_metrics]),delimiter='\t')
+            temp_path_high_risk='./perm_graph_metrics_high_risk_vol.txt'
+            with open(temp_path_high_risk,'ab') as f:
+                np.savetxt(f,np.concatenate([original_network_metrics_high,random_network_metrics_high]).reshape(1,-1),delimiter='\t')
 
-#             temp_path_high_risk='./log/diffusion/preterm/PRS10/perm_graph_metrics_high_risk_diffusion_preterm_PRS10_vm1_run1.txt'
-#             perm_high_risk_metrics=graph_analysis.calculate_network_metrics_random_volumetric_data(data_preprocessing.reverse_lower_triangle(binarized_perm_high_risk[threshold],51),n_random=10,small_worldness=True)
+            #low risk
+            original_network_metrics_low, random_network_metrics_low = graph_analysis.calculate_network_metrics_bin_und(temp_corr_matrix_low_risk)
 
-#             with open(temp_path_high_risk,'ab') as n:
-#                 np.savetxt(n,np.asarray([perm_high_risk_metrics]),delimiter='\t')
-#     except StopIteration:
-#         break
-    
-print('STARTING TERM')
-
-for _ in tqdm.tqdm(range(500)):
-    try:
-        binarized_perm_low_risk,binarized_perm_high_risk=next(random_graph_generator_term)
-        
-        for threshold in tqdm.tqdm(range(30)):
-            temp_path_low_risk='./log/diffusion/term/PRS8/perm_graph_metrics_low_risk_diffusion_term_PRS8_vm2_run1.txt'
-            perm_low_risk_metrics=graph_analysis.calculate_network_metrics_random_volumetric_data(data_preprocessing.reverse_lower_triangle(binarized_perm_low_risk[threshold],51),n_random=10,small_worldness=True)
-
+            temp_path_low_risk='./perm_graph_metrics_low_risk_vol.txt'
             with open(temp_path_low_risk,'ab') as f:
-                np.savetxt(f,np.asarray([perm_low_risk_metrics]),delimiter='\t')
+                np.savetxt(f,np.concatenate([original_network_metrics_low,random_network_metrics_low]).reshape(1,-1),delimiter='\t')
 
-            temp_path_high_risk='./log/diffusion/term/PRS8/perm_graph_metrics_high_risk_diffusion_term_PRS8_vm2_run1.txt'
-            perm_high_risk_metrics=graph_analysis.calculate_network_metrics_random_volumetric_data(data_preprocessing.reverse_lower_triangle(binarized_perm_high_risk[threshold],51),n_random=10,small_worldness=True)
 
-            with open(temp_path_high_risk,'ab') as n:
-                np.savetxt(n,np.asarray([perm_high_risk_metrics]),delimiter='\t')
-    except StopIteration:
-        break
+X_total=np.load('./X_total.npy')
+adjusted_prs_score=np.load('./adjusted_prs_score.npy')
+
+for _ in tqdm.tqdm(range(1000)):
+    high_risk,low_risk = data_preprocessing.high_low_risk_divide(np.random.permutation(adjusted_prs_score),high_perc=0.2,low_perc=0.4)
+    X_low_risk=X_total[low_risk,:]
+    X_high_risk=X_total[high_risk,:]
+    high_risk_corr_matrix=np.corrcoef(X_high_risk,rowvar=False)
+    low_risk_corr_matrix=np.corrcoef(X_low_risk,rowvar=False)
+    high_risk_corr_matrix=0.5*(np.log(1+high_risk_corr_matrix)-np.log(1-high_risk_corr_matrix))#convert to z score
+    np.fill_diagonal(high_risk_corr_matrix,0)
+    low_risk_corr_matrix=0.5*(np.log(1+low_risk_corr_matrix)-np.log(1-low_risk_corr_matrix))#convert to z score
+    np.fill_diagonal(low_risk_corr_matrix,0)
+    
+    analyse_graph(low_risk_corr_matrix,high_risk_corr_matrix).network_metrics()
+    

@@ -2,9 +2,10 @@
 This contains the function to perform network statistics
 """
 from random import choice,choices
-# from functools import partial
+from functools import partial
 import numpy as np
-# import pandas as pd
+import bct
+import pandas as pd
 import networkx as nx
 from networkx import from_numpy_array
 from networkx.algorithms.efficiency_measures import global_efficiency, local_efficiency
@@ -52,7 +53,7 @@ from . import data_preprocessing
 #     return Graph
 
 
-def binarize_matrix_based_on_sparsity_threshold(corrmatrix,percentage,bins=10):
+def binarize_matrix_based_on_sparsity_threshold(correlation_matrix,percentage):
     """
     The connections are first ranked based on their weights (either diffusion 
         value or corrleation coefficients) and then we binarize the matrix so 
@@ -66,12 +67,12 @@ def binarize_matrix_based_on_sparsity_threshold(corrmatrix,percentage,bins=10):
         binarized_corrmatrix: the binarized matrix. square matrix
     
     """
+    corrmatrix=correlation_matrix.copy()
     connections=data_preprocessing.lower_triangle(corrmatrix)
-    counts,the_bin=np.histogram(connections,bins=bins)
-    number_to_retain=percentage*len(connections)
-    cut_off_idx=np.where(np.cumsum(counts[::-1])>=number_to_retain)[0][0]
-    threshold=the_bin[::-1][cut_off_idx+1]
-    binarized_corrmatrix=np.where(corrmatrix[:,:]>threshold,float(1),float(0))
+    connections_sorted=np.sort(abs(connections))[::-1]#high_to_low
+    threshold=connections_sorted[int(len(connections)*percentage)-1]
+    connections=np.where(abs(connections)>=threshold,float(1),float(0))
+    binarized_corrmatrix=data_preprocessing.reverse_lower_triangle(connections,corrmatrix.shape[0])
     return binarized_corrmatrix
 
 def yield_perm_matrices_volumetric_data(X,perm_run,network_sparisity,diffusion_data=False):
@@ -315,3 +316,44 @@ def calculate_perm_p_value(obsv_high,obsv_low,perm_high,perm_low,metrics=5):
         for metric in range(metrics):# 5 metrics
             p_value_matrix[network_sparsity_threshold,metric]=len(np.where(between_group_difference[:,network_sparsity_threshold,metric]>=obsv_difference[network_sparsity_threshold,metric])[0])/between_group_difference.shape[0]
     return p_value_matrix
+
+
+def calculate_path_and_efficiency_bin(G):
+    """
+    Return the following network metrics for your graph. Uses brain connectivity tool-box.
+    Input:
+        G (np.array): binarized matrix, symmetric
+    Outputs:
+        Eglob: Global efficiency
+        average_Elocal: mean Local Efficiency
+        char_path: Average shortest path length
+        clustering: Average Clustering coefficient
+    
+    """
+    if not np.allclose(G,G.T):
+        raise bct.BCTParamError('Not undirected')
+
+    average_shortest_path,Eglob,_,_,_=bct.charpath(bct.distance_bin(G))
+    average_clustering=np.mean(abs(bct.clustering_coef_bu(G)))
+    average_Elocal=np.mean(bct.efficiency_bin(G,1))
+
+    return Eglob,average_Elocal,average_clustering,average_shortest_path
+
+def calculate_network_metrics_bin_und(binarized_matrix,random_network_n=100):
+    """
+    Calculate the network metrics for the original and the randomized network
+    """
+    assert len(np.unique(binarized_matrix))==2#binarized matrix
+    assert np.allclose(binarized_matrix,binarized_matrix.T)#undirected
+
+    original_network_metrics = calculate_path_and_efficiency_bin(binarized_matrix)
+
+    random_network=(bct.randmio_und(binarized_matrix,2)[0] for _ in range(random_network_n))
+
+    random_network_metrics = np.zeros(4,)
+    for _ in range(random_network_n):
+        random_network_metrics += np.asarray(calculate_path_and_efficiency_bin(next(random_network))) #sum up all the randomizations.
+    
+    random_network_metrics = random_network_metrics/random_network_n #get the average values
+
+    return np.array(original_network_metrics), random_network_metrics

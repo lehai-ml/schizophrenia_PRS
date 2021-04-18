@@ -9,7 +9,8 @@ from sklearn.model_selection import KFold
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.feature_selection import f_regression
-
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 #Network visualisation and algorithm
 # import networkx as nx
 # from networkx.algorithms.community import greedy_modularity_communities
@@ -225,49 +226,49 @@ def remove_correlated_features(X,target,threshold=0.85): #calculate corr coef re
 
     return dict_of_features
 
-# def remove_correlated_features(X,target,threshold=0.8):# using connected components
-#     """
-#     Remove correlated features. Find the connected components and I average the values.
-#     Args:
-#         X np.array: the feature matrix.
-#         target np.array: 1D shape the target that the features are selected 
-#         upon.
-#         threshold (0-1): correlation coefficient threshold the correlated pairs 
-#         are selected.
+def remove_correlated_features_with_connected_component(X,target,threshold=0.8):# using connected components
+    """
+    Remove correlated features. Find the connected components and I average the values.
+    Args:
+        X np.array: the feature matrix.
+        target np.array: 1D shape the target that the features are selected 
+        upon.
+        threshold (0-1): correlation coefficient threshold the correlated pairs 
+        are selected.
     
-#     Returns:
-#         dict_of_features (defaultdict(list)): dictionary where the keys are the
-#         index of the features, and the values, are the index of features that 
-#         the key feature represent.
+    Returns:
+        dict_of_features (defaultdict(list)): dictionary where the keys are the
+        index of the features, and the values, are the index of features that 
+        the key feature represent.
     
-#     Example:
-#         > remove_correlated_features(X,target,threshold=0.8)
-#         >> {[0]: [0],[1]: [1,2,3,4],...}
-#         here the feature 1 can represent the features 2,3 and 4.
+    Example:
+        > remove_correlated_features(X,target,threshold=0.8)
+        >> {[0]: [0],[1]: [1,2,3,4],...}
+        here the feature 1 can represent the features 2,3 and 4.
     
-#     """
-#     X=X.copy() # avoid changes to the original array
-#     dict_of_features=defaultdict(list)
+    """
+    X=X.copy() # avoid changes to the original array
+    dict_of_features=defaultdict(list)
     
-#     corr_matrix_with_target=np.asarray([pearsonr(X[:,i],target)[0] for i in range(X.shape[1])])#first calculate the corr coef between the target and the feature
-#     corr_matrix_between_features=np.corrcoef(X,rowvar=False) # calculate the correlation matrix between features
-#     corr_matrix_between_features=np.tril(corr_matrix_between_features,-1)# set everything above the diagonal, and the diagonal to 0.
-#     binarized_corr_matrix=np.where(corr_matrix_between_features<threshold,0,1)#set anything below the threshold to 0 and otherwise to 1.
-#     binarized_corr_matrix_Graph=csr_matrix(binarized_corr_matrix)
-#     n_components,labels=connected_components(binarized_corr_matrix_Graph,directed=False) # find the connected components and the labels for each of that component.
-#     for label in range(n_components): # labels will be an array of labels 
-#         # ordered by the indices of the vertices, i.e. [0,0,1,2,3]- the first 
-#         # and second nodes are connected in the one connected graph, whereas 
-#         # the third, fourth and fifth nodes do not have anywhere to be 
-#         # connected, in the binarized matrix, they are zero values.
-#         features=np.where(labels==label)[0]#this will give the indices of the vertices in the same connected component.
-#         if len(features)>1:
-#             representative_feature=features[np.argmax(abs(corr_matrix_with_target[features]))]#check which feature has the best correlation to the target and use that as the represented name.
-#             dict_of_features[representative_feature]=list(features)
-#         else:
-#             dict_of_features[features[0]]=list(features)
+    corr_matrix_with_target=np.asarray([pearsonr(X[:,i],target)[0] for i in range(X.shape[1])])#first calculate the corr coef between the target and the feature
+    corr_matrix_between_features=np.corrcoef(X,rowvar=False) # calculate the correlation matrix between features
+    corr_matrix_between_features=np.tril(corr_matrix_between_features,-1)# set everything above the diagonal, and the diagonal to 0.
+    binarized_corr_matrix=np.where(corr_matrix_between_features<threshold,0,1)#set anything below the threshold to 0 and otherwise to 1.
+    binarized_corr_matrix_Graph=csr_matrix(binarized_corr_matrix)
+    n_components,labels=connected_components(binarized_corr_matrix_Graph,directed=False) # find the connected components and the labels for each of that component.
+    for label in range(n_components): # labels will be an array of labels 
+        # ordered by the indices of the vertices, i.e. [0,0,1,2,3]- the first 
+        # and second nodes are connected in the one connected graph, whereas 
+        # the third, fourth and fifth nodes do not have anywhere to be 
+        # connected, in the binarized matrix, they are zero values.
+        features=np.where(labels==label)[0]#this will give the indices of the vertices in the same connected component.
+        if len(features)>1:
+            representative_feature=features[np.argmax(abs(corr_matrix_with_target[features]))]#check which feature has the best correlation to the target and use that as the represented name.
+            dict_of_features[representative_feature]=list(features)
+        else:
+            dict_of_features[features[0]]=list(features)
             
-#     return dict_of_features
+    return dict_of_features
 
 def merge_features_values(X,dict_of_features,average=False):
     """
@@ -432,7 +433,7 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
         The keys and values are mapped to strings.
     
     '''
-    def __init__(self,target,thresh=0.8,average=False):
+    def __init__(self,target,thresh=0.8,average=False,connected_components=False):
         """
         Initialise the model with the target matrix
         Arg:
@@ -445,6 +446,7 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
         self.target=target
         self.thresh=thresh
         self.average=average
+        self.connected_components=connected_components
 
     
     def fit (self,X,y=None):
@@ -459,8 +461,10 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
         Return
             self.features_dict (defaultdict(list)): {[0]:[0],[1]:[1,2,3]...}
         """
-                 
-        self.features_dict=remove_correlated_features(X,self.target,self.thresh)
+        if self.connected_components:
+            self.features_dict = remove_correlated_features_with_connected_component(X,self.target,self.thresh)
+        else:
+            self.features_dict=remove_correlated_features(X,self.target,self.thresh)
 
         return self
     
@@ -502,47 +506,53 @@ class High_Corr_Remover(BaseEstimator,TransformerMixin):
         self.reduced_features_names=feature_names[mask]
         return self
 
+# class Select_Features_Univariate(BaseEstimator,TransformerMixin):
+#     """
+#     Fit univariate linear regression test to each feature column, and check its 
+#     association with the target. Select the features with pval<0.05
+#     Attributes:
+#         @self.F= calculated F-scores
+#         @self.p_val= calculated p-values of F-scores
+#         @self.reduced_features_names=the new reduced feature column names.
+#     Note:
+#         This f_regression func gives the same result as sm.OLS.
+#     """
+#     def __init__(self,target,p_value_threshold=0.05):
+#         self.p_value_threshold=p_value_threshold
+#         self.target=target
+        
+#     def fit(self,X,y=None):
+#         self.F,self.p_val=f_regression(X,self.target)
+#         return self
+    
+#     def transform(self,X,y=None):
+#         new_X=X.copy()
+#         new_X=new_X[:,self.p_val<=self.p_value_threshold]
+#         return new_X
+    
+#     def get_column_names(self,feature_names):
+#         self.reduced_features_names=feature_names[self.p_val<=self.p_value_threshold]
+        
 class Select_Features_Univariate(BaseEstimator,TransformerMixin):
     """
-    Fit univariate linear regression test to each feature column, and check its 
-    association with the target. Select the features with pval<0.05
-    Attributes:
-        @self.F= calculated F-scores
-        @self.p_val= calculated p-values of F-scores
-        @self.reduced_features_names=the new reduced feature column names.
-    Note:
-        This f_regression func gives the same result as sm.OLS.
+    Fitting to linear regression. Select feature that has p-value to the target less than p-threshold.
     """
-    def __init__(self,target,p_value_threshold=0.05):
-        self.p_value_threshold=p_value_threshold
-        self.target=target
-        
-    def fit(self,X,y=None):
-        self.F,self.p_val=f_regression(X,self.target)
-        return self
-    
-    def transform(self,X,y=None):
-        new_X=X.copy()
-        new_X=new_X[:,self.p_val<=self.p_value_threshold]
-        return new_X
-    
-    def get_column_names(self,feature_names):
-        self.reduced_features_names=feature_names[self.p_val<=self.p_value_threshold]
-        
-class Select_Features_Multivariate(BaseEstimator,TransformerMixin):
-    def __init__(self,target,covariates,p_value_threshold=0.05):
+    def __init__(self,target,covariates=None,p_value_threshold=0.05,normalize=True):
         self.target=target
         self.p_value_threshold=p_value_threshold
         self.covariates=covariates
-
+        self.normalize=normalize
     def fit(self,X,y=None):
         self.p_value=[]
+        self.coefficients=[]
         independent_Var=np.concatenate((self.covariates,self.target.reshape(-1,1)),axis=1)
         independent_Var=sm.add_constant(independent_Var)
         for col in range(X.shape[1]):
             model=sm.OLS(X[:,col],independent_Var).fit()
             self.p_value.append(model.pvalues[-1])
+            self.coefficients.append(model.params[-1])
         self.p_value=np.asarray(self.p_value)
+        self.coefficients=np.asarray(self.coefficients)
         
         return self
     
@@ -565,12 +575,26 @@ class Select_Features_Multivariate(BaseEstimator,TransformerMixin):
         self.largest_component_size=np.max(component_sizes)
         return self.largest_component_size
         
-
+class myPipe(Pipeline):
+    """
+    Provides the underlying coef_ and feature_importances of the pipe. This is 
+    required because RFECV cannot find the coef_ or feature_importances of the 
+    underlying model.
+    """
+    def fit(self,X,y):
+        super(myPipe,self).fit(X,y)
+        try:
+            self.coef_=self.steps[-1][-1].coef_
+        except AttributeError:
+            try:
+                self.feature_importances_=self.steps[-1][-1].feature_importances_
+            except: # in case the model is KNN
+                pass
 
 def print_scores(y_pred,y_true):
     return {'r2': r2_score(y_true,y_pred),
     'MAE': mean_absolute_error(y_true,y_pred),
-    'MSE': mean_squared_error(y_true,y_pred),
+    'RMSE': mean_squared_error(y_true,y_pred,squared=False),
     'Correlation':pearsonr(y_true,y_pred)[0],
     'p_value':pearsonr(y_true,y_pred)[1]}
 

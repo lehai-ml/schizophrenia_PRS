@@ -22,7 +22,7 @@ test.*
 .vscode/
 dataset/
 log/
-
+preprocessed_data/
 #R extensions
 .RData
 .Rhistory
@@ -76,6 +76,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+*.txt
+*.mlx
 
 # Translations
 *.mo

@@ -290,7 +290,6 @@ def preprocess_perm_graph_results(shape,**kwargs):
             temp_result_low=temp_result_low[0:new_n_sample,:]
 
         perm_high.append(temp_result_high)
-        perm_low.append(temp_result_low)
     perm_high=np.vstack(perm_high).reshape(shape)
     perm_low=np.vstack(perm_low).reshape(shape)
     return perm_high,perm_low
